@@ -26,7 +26,7 @@
   "gui.aipatternizer.setup.returned": "- %s：需从机器抽回网络；供应器建议开阻挡模式/锁定合成",
   "gui.aipatternizer.setup.preplaced": "- %s：请预置于机器内，并确保不会被抽走",
   "gui.aipatternizer.setup.durability": "- %s：每件可用 %s 次，建议另写它的合成样板形成闭环",
-  "gui.aipatternizer.no_recipe": "该物品没有%s配方：%s",
+  "gui.aipatternizer.no_recipe": "该物品没有任何可编码的配方路线：%s",
   "gui.aipatternizer.no_recipe_hint": "它可能是仪式/机器/掉落获取——换个说法让它写处理样板（描述制作过程）。",
   "gui.aipatternizer.type.CRAFTING": "合成",
   "gui.aipatternizer.type.PROCESSING": "处理",

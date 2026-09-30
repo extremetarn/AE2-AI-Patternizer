@@ -224,7 +224,7 @@ public class EncodeGameTest {
     @GameTest(template = "empty")
     public static void machineRecipeBecomesProcessing(GameTestHelper helper) {
         PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "ae2:engineering_processor");
-        var options = RecipeResolver.enumerate(helper.getLevel().getServer(), helper.getLevel(),
+        var options = RecipeResolver.enumerate(helper.getLevel().getServer().getRecipeManager(), helper.getLevel(),
                 "ae2:engineering_processor");
         helper.assertFalse(options.isEmpty(), "no routes enumerated for engineering_processor");
         helper.assertTrue(options.stream().anyMatch(o -> o.kind() == RecipeResolver.Kind.MACHINE),

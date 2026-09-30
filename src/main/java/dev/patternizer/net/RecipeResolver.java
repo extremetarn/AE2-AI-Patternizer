@@ -79,7 +79,7 @@ public final class RecipeResolver {
 
         // 玩家已指定具体配方（选择界面回传）：全类型按 id 精确编码
         if (spec.recipeId != null && !spec.recipeId.isBlank()) {
-            Recipe<?> recipe = findById(server, level, spec.recipeId);
+            Recipe<?> recipe = findById(server.getRecipeManager(), level, spec.recipeId);
             if (recipe == null) {
                 return new Resolution.Failed("recipe_not_found", spec.recipeId);
             }
@@ -87,14 +87,14 @@ public final class RecipeResolver {
         }
 
         // 全量枚举（v0.11 原则：不走捷径）
-        List<Option> options = enumerate(server, level, spec.target);
+        List<Option> options = enumerate(server.getRecipeManager(), level, spec.target);
         if (options.isEmpty()) {
             return new Resolution.Failed("recipe_not_found", spec.target);
         }
         if (options.size() > 1) {
             return new Resolution.ChooseRecipe(options);
         }
-        Recipe<?> recipe = findById(server, level, options.get(0).recipeId());
+        Recipe<?> recipe = findById(server.getRecipeManager(), level, options.get(0).recipeId());
         if (recipe == null) {
             return new Resolution.Failed("recipe_not_found", spec.target);
         }
@@ -104,8 +104,10 @@ public final class RecipeResolver {
     /**
      * 全量枚举目标物品的全部有效制造路线。
      * 遍历 ForgeRegistries.RECIPE_TYPES（含模组机器配方类型）。
+     * 参数为 RecipeManager，客户端（同步配方本）与服务端均可调用。
      */
-    public static List<Option> enumerate(MinecraftServer server, Level level, String targetId) {
+    public static List<Option> enumerate(net.minecraft.world.item.crafting.RecipeManager recipeManager,
+            Level level, String targetId) {
         List<Option> out = new ArrayList<>();
         Item target = ForgeRegistries.ITEMS.getValue(new ResourceLocation(targetId));
         if (target == null) {
@@ -115,7 +117,7 @@ public final class RecipeResolver {
             ResourceLocation typeKey = ForgeRegistries.RECIPE_TYPES.getKey(type);
             String typeId = typeKey != null ? typeKey.toString() : "unknown:unknown";
             Kind kind = classify(type);
-            for (Recipe<?> recipe : allOf(server, type)) {
+            for (Recipe<?> recipe : allOf(recipeManager, type)) {
                 if (!isValidRoute(recipe, level, target)) {
                     continue;
                 }
@@ -160,15 +162,17 @@ public final class RecipeResolver {
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private static List<? extends Recipe<?>> allOf(MinecraftServer server, RecipeType<?> type) {
-        return (List) server.getRecipeManager().getAllRecipesFor((RecipeType) type);
+    private static List<? extends Recipe<?>> allOf(net.minecraft.world.item.crafting.RecipeManager recipeManager,
+            RecipeType<?> type) {
+        return (List) recipeManager.getAllRecipesFor((RecipeType) type);
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private static Recipe<?> findById(MinecraftServer server, Level level, String recipeId) {
+    private static Recipe<?> findById(net.minecraft.world.item.crafting.RecipeManager recipeManager, Level level,
+            String recipeId) {
         ResourceLocation id = new ResourceLocation(recipeId);
         for (RecipeType<?> type : ForgeRegistries.RECIPE_TYPES) {
-            for (Recipe<?> recipe : (List<Recipe<?>>) (List) server.getRecipeManager()
+            for (Recipe<?> recipe : (List<Recipe<?>>) (List) recipeManager
                     .getAllRecipesFor((RecipeType) type)) {
                 if (recipe.getId().equals(id)) {
                     return recipe;
@@ -187,19 +191,28 @@ public final class RecipeResolver {
             ItemStack encoded = encodeStonecutting(level, stonecutting, spec);
             return encoded != null
                     ? new Resolution.Encoded(encoded, "minecraft:stonecutting")
-                    : new Resolution.Failed("unsupported_type", recipe.getId().toString());
+                    : fallbackToMachine(level, recipe);
         }
         if (recipe instanceof SmithingRecipe smithing) {
             ItemStack encoded = encodeSmithing(level, smithing, spec);
             return encoded != null
                     ? new Resolution.Encoded(encoded, "minecraft:smithing")
-                    : new Resolution.Failed("unsupported_type", recipe.getId().toString());
+                    : fallbackToMachine(level, recipe);
         }
         ItemStack encoded = encodeMachineRecipe(level, recipe);
         return encoded != null
             ? new Resolution.Encoded(encoded,
                     ForgeRegistries.RECIPE_TYPES.getKey(recipe.getType()).toString())
             : new Resolution.Failed("unsupported_type", recipe.getId().toString());
+    }
+
+    /** 原生编码失败（如锻造配方存在空槽位）时退回处理样板编码。 */
+    private static Resolution fallbackToMachine(Level level, Recipe<?> recipe) {
+        ItemStack encoded = encodeMachineRecipe(level, recipe);
+        return encoded != null
+                ? new Resolution.Encoded(encoded,
+                        ForgeRegistries.RECIPE_TYPES.getKey(recipe.getType()).toString())
+                : new Resolution.Failed("unsupported_type", recipe.getId().toString());
     }
 
     private static ItemStack encodeCrafting(Level level, CraftingRecipe recipe, PatternSpec spec) {
