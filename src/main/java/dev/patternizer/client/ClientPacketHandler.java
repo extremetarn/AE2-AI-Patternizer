@@ -44,7 +44,9 @@ public final class ClientPacketHandler {
                         false);
             }
         } else {
-            mc.player.displayClientMessage(Component.literal(" - " + detail), false);
+            // note 兜底截断：即使模型啰嗦，聊天栏也只显示前 80 字（§10.22 提示词纪律）
+            String text = detail.length() <= 80 ? detail : detail.substring(0, 80) + "…";
+            mc.player.displayClientMessage(Component.literal(" - " + text), false);
         }
     }
 }

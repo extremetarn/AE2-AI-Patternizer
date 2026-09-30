@@ -36,7 +36,9 @@ public final class PromptBuilder {
                 10. options.allow_substitutes（原料等价替换）默认写 true——木棍/矿锭这类配方必须允许
                    替换；仅当玩家明确要求「锁死某一种材料」时才写 false。
                    allow_fluid_substitutes 默认 false。
-                11. note 字段用中文简要说明你的判断理由（选路/催化剂策略）。
+                11. note 是【给玩家看的一句话结果说明】（≤30 字），格式示例：
+                   「合成样板：矿锭+木棍→ATM镐」「处理样板：注魔水晶按预置式处理」。
+                   禁止在 note 中提及校验、错误、重试、候选清单、注册名选择过程等内部细节。
                 JSON Schema:
                 {"type":"...","target":"...","inputs":[...],"outputs":[...],
                  "durability_batch":{"tool":"...","uses_per_tool":1},"note":"...",
