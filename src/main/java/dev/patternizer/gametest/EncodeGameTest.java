@@ -233,6 +233,27 @@ public class EncodeGameTest {
         return spec;
     }
 
+    /** M3.5：不可收回黑名单——命中即强制预置式，布局中不再出现该物品。 */
+    @GameTest(template = "empty")
+    public static void catalystPolicyBlacklist(GameTestHelper helper) {
+        PatternSpec spec = new PatternSpec();
+        spec.type = PatternSpec.Type.PROCESSING;
+        spec.inputs.add(itemEntry("minecraft:iron_ingot", 4, PatternSpec.Role.CONSUMED));
+        spec.inputs.add(itemEntry("mysticalagriculture:infusion_crystal", 1, PatternSpec.Role.CATALYST_RETURNED));
+        spec.outputs.add(itemEntry("minecraft:iron_block", 1, PatternSpec.Role.CONSUMED));
+
+        var hits = dev.patternizer.spec.CatalystPolicy.apply(spec, java.util.Set.of());
+        helper.assertTrue(hits.size() == 1 && hits.get(0).equals("mysticalagriculture:infusion_crystal"),
+                "expected one blacklist hit but got " + hits);
+        helper.assertTrue(spec.inputs.get(1).role == PatternSpec.Role.CATALYST_PREPLACED,
+                "role should be forced to CATALYST_PREPLACED");
+        // 布局：预置式不占任何样板格
+        GenericStack[] in = CatalystLayout.buildInputs(spec);
+        GenericStack[] out = CatalystLayout.buildOutputs(spec);
+        helper.assertTrue(in.length == 1, "preplaced catalyst should not occupy an input slot");
+        helper.assertTrue(out.length == 1, "preplaced catalyst should not appear as byproduct");
+        helper.succeed();
+    }
     /** 网格接入：编写台与创造能源元件 + 控制器组网时应成功加入 ME 网络并上线。 */
     @GameTest(template = "empty")
     public static void gridConnection(GameTestHelper helper) {

@@ -17,6 +17,10 @@
   "gui.aipatternizer.preview.outputs": "输出：",
   "gui.aipatternizer.preview.note": "说明：%s",
   "gui.aipatternizer.more_lines": "……还有 %s 行",
+  "gui.aipatternizer.setup.title": "配套搭建清单：",
+  "gui.aipatternizer.setup.returned": "- %s：需从机器抽回网络；供应器建议开阻挡模式/锁定合成",
+  "gui.aipatternizer.setup.preplaced": "- %s：请预置于机器内，并确保不会被抽走",
+  "gui.aipatternizer.setup.durability": "- %s：每件可用 %s 次，建议另写它的合成样板形成闭环",
 
   "gui.aipatternizer.role.CONSUMED": "",
   "gui.aipatternizer.role.CATALYST_RETURNED": "（催化剂·返还）",

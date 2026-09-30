@@ -28,6 +28,9 @@ public final class ClientPacketHandler {
             return;
         }
         mc.player.displayClientMessage(Component.translatable("message.aipatternizer.encode." + result), false);
+        if ("ok".equals(result) && mc.screen instanceof dev.patternizer.client.screen.AiPatternizerScreen aps) {
+            aps.onEncodeOk();
+        }
         if (detail == null || detail.isEmpty()) {
             return;
         }

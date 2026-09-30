@@ -153,6 +153,36 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         Minecraft.getInstance().setScreen(new RecipeChoiceScreen(this, this.confirmedSpec, recipeIds));
     }
 
+    /** 编码成功：在状态区展示配套搭建清单（§6.2 / M3.5）。 */
+    public void onEncodeOk() {
+        this.statusLines.clear();
+        PatternSpec spec = this.confirmedSpec;
+        if (spec == null) {
+            return;
+        }
+        List<Component> setup = new ArrayList<>();
+        for (Entry e : spec.inputs) {
+            switch (e.role) {
+            case CATALYST_RETURNED -> setup.add(Component.translatable(
+                    "gui.aipatternizer.setup.returned", displayNameOf(e.item)));
+            case CATALYST_PREPLACED -> setup.add(Component.translatable(
+                    "gui.aipatternizer.setup.preplaced", displayNameOf(e.item)));
+            case CATALYST_DURABILITY -> {
+                int uses = spec.durabilityBatch != null ? spec.durabilityBatch.usesPerTool : 0;
+                setup.add(Component.translatable(
+                        "gui.aipatternizer.setup.durability", displayNameOf(e.item), uses));
+            }
+            default -> {
+            }
+            }
+        }
+        if (setup.isEmpty()) {
+            return;
+        }
+        this.statusLines.add(Component.translatable("gui.aipatternizer.setup.title"));
+        this.statusLines.addAll(setup);
+    }
+
     private void buildPreview(PatternSpec spec) {
         this.previewLines.clear();
         if (spec.type != PatternSpec.Type.PROCESSING) {

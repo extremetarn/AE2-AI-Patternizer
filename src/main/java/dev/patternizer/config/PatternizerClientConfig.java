@@ -1,5 +1,7 @@
 package dev.patternizer.config;
 
+import java.util.List;
+
 import net.minecraftforge.common.ForgeConfigSpec;
 
 /**
@@ -23,6 +25,7 @@ public final class PatternizerClientConfig {
     public static final ForgeConfigSpec.EnumValue<ProxyMode> PROXY_MODE;
     public static final ForgeConfigSpec.ConfigValue<String> PROXY_HOST;
     public static final ForgeConfigSpec.IntValue PROXY_PORT;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> UNRETURNABLE_CATALYSTS;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -51,10 +54,21 @@ public final class PatternizerClientConfig {
                 .defineInRange("port", 7890, 1, 65535);
         b.pop();
 
+        b.push("catalyst");
+        UNRETURNABLE_CATALYSTS = b.comment(
+                "Additional 'unreturnable' catalysts (modid:name) on top of the built-in blacklist.",
+                "Items listed here are forced from catalyst_returned to catalyst_preplaced.")
+                .defineList("extraUnreturnable", List.of(), o -> o instanceof String);
+        b.pop();
+
         SPEC = b.build();
     }
 
     private PatternizerClientConfig() {
+    }
+
+    public static java.util.Set<String> unreturnableSet() {
+        return new java.util.HashSet<>(UNRETURNABLE_CATALYSTS.get());
     }
 
     public static void save() {

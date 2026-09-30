@@ -21,7 +21,7 @@ import dev.patternizer.spec.PatternSpecValidator.ValidationError;
 public final class LlmGenerateService {
 
     public sealed interface Result {
-        record Ok(PatternSpec spec, String rawJson) implements Result {
+        record Ok(PatternSpec spec, String rawJson, List<String> policyHits) implements Result {
         }
 
         record Failed(List<String> errorLines) implements Result {
@@ -37,8 +37,9 @@ public final class LlmGenerateService {
     public static void generate(String prompt, Consumer<Result> callback) {
         List<String> items = ItemCandidateSearch.search(prompt);
         List<String> fluids = ItemCandidateSearch.searchFluids(prompt, 20);
+        var durabilityInfo = ItemCandidateSearch.durabilityInfo(items);
 
-        List<Message> messages = PromptBuilder.initialMessages(prompt, items, fluids);
+        List<Message> messages = PromptBuilder.initialMessages(prompt, items, fluids, durabilityInfo);
         OpenAiCompatibleClient client = new OpenAiCompatibleClient();
         int maxRetries = PatternizerClientConfig.MAX_RETRIES.get();
 
@@ -67,7 +68,10 @@ public final class LlmGenerateService {
             }
 
             if (spec != null && errorLines.isEmpty()) {
-                callback.accept(new Result.Ok(spec, content));
+                // 催化剂策略（§10.15）：不可收回黑名单强制预置式
+                List<String> policyHits = dev.patternizer.spec.CatalystPolicy.apply(
+                        spec, dev.patternizer.config.PatternizerClientConfig.unreturnableSet());
+                callback.accept(new Result.Ok(spec, content, policyHits));
                 return;
             }
             if (attempt >= maxRetries) {

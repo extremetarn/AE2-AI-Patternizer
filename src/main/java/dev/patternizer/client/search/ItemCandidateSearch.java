@@ -128,4 +128,20 @@ public final class ItemCandidateSearch {
         out.addAll(common);
         return out;
     }
+
+    /** 候选物品的耐久属性（§5.4.5 催化剂线索）：仅返回 maxDamage>0 的条目。 */
+    public static java.util.Map<String, Integer> durabilityInfo(List<String> itemIds) {
+        java.util.Map<String, Integer> out = new java.util.LinkedHashMap<>();
+        for (String idStr : itemIds) {
+            var item = ForgeRegistries.ITEMS.getValue(new net.minecraft.resources.ResourceLocation(idStr));
+            if (item == null) {
+                continue;
+            }
+            int maxDamage = item.getDefaultInstance().getMaxDamage();
+            if (maxDamage > 0) {
+                out.put(idStr, maxDamage);
+            }
+        }
+        return out;
+    }
 }

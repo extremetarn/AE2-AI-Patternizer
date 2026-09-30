@@ -44,10 +44,15 @@ public final class PromptBuilder {
                 """;
     }
 
-    public static String userPrompt(String playerRequest, List<String> itemCandidates, List<String> fluidCandidates) {
+    public static String userPrompt(String playerRequest, List<String> itemCandidates, List<String> fluidCandidates,
+            java.util.Map<String, Integer> durabilityInfo) {
         StringBuilder sb = new StringBuilder();
         sb.append("候选物品清单: ").append(itemCandidates).append('\n');
         sb.append("候选流体清单: ").append(fluidCandidates).append('\n');
+        if (durabilityInfo != null && !durabilityInfo.isEmpty()) {
+            sb.append("候选物品的耐久上限: ").append(durabilityInfo)
+                    .append("（玩家说某物「仅耗耐久」时用 catalyst_durability，uses_per_tool 不得超过该耐久值）\n");
+        }
         sb.append("玩家需求: ").append(playerRequest);
         return sb.toString();
     }
@@ -58,9 +63,10 @@ public final class PromptBuilder {
                 + "\n请仅输出修正后的完整 JSON（仍然只输出 JSON，不要解释）。";
     }
 
-    public static List<Message> initialMessages(String playerRequest, List<String> items, List<String> fluids) {
+    public static List<Message> initialMessages(String playerRequest, List<String> items, List<String> fluids,
+            java.util.Map<String, Integer> durabilityInfo) {
         return new java.util.ArrayList<>(List.of(
                 new Message("system", systemPrompt()),
-                new Message("user", userPrompt(playerRequest, items, fluids))));
+                new Message("user", userPrompt(playerRequest, items, fluids, durabilityInfo))));
     }
 }

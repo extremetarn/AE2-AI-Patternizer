@@ -57,6 +57,11 @@ public final class ServerPatternEncoder {
         if (!(player.containerMenu instanceof AiPatternizerMenu menu)) {
             return new String[] { "no_menu", null };
         }
+        // 催化剂策略防御（§10.15）：客户端漏网的黑名单命中在服务端兜底
+        List<String> policyHits = dev.patternizer.spec.CatalystPolicy.apply(spec, java.util.Set.of());
+        if (!policyHits.isEmpty()) {
+            LOGGER.info("CatalystPolicy forced preplaced for {} (player {})", policyHits, player.getName().getString());
+        }
         ItemStackHandler storage = menu.getStorage();
         Item blankPattern = ForgeRegistries.ITEMS.getValue(BLANK_PATTERN_ID);
         if (blankPattern == null) {

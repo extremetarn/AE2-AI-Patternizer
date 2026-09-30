@@ -17,6 +17,10 @@
   "gui.aipatternizer.preview.outputs": "Outputs:",
   "gui.aipatternizer.preview.note": "Note: %s",
   "gui.aipatternizer.more_lines": "... +%s more",
+  "gui.aipatternizer.setup.title": "Setup checklist:",
+  "gui.aipatternizer.setup.returned": "- %s: must be pulled back into the network; blocking mode / lock crafting recommended",
+  "gui.aipatternizer.setup.preplaced": "- %s: pre-place it in the machine; make sure it cannot be extracted",
+  "gui.aipatternizer.setup.durability": "- %s: consumed per %s uses; consider a crafting pattern for it to close the loop",
 
   "gui.aipatternizer.role.CONSUMED": "",
   "gui.aipatternizer.role.CATALYST_RETURNED": " [catalyst, returned]",
