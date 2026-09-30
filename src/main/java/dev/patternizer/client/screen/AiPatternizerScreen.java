@@ -319,6 +319,21 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
     }
 
     @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // 输入框聚焦时吞掉除 ESC 外的全部按键——否则打英文会触发游戏快捷键
+        //（比如按 E 关界面），与铁砧改名界面同款处理
+        if (keyCode == 256) {
+            this.onClose();
+            return true;
+        }
+        if (this.promptBox != null && this.promptBox.canConsumeInput()) {
+            this.promptBox.keyPressed(keyCode, scanCode, modifiers);
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (mouseX >= this.leftPos + CONSOLE_X0 && mouseX <= this.leftPos + CONSOLE_X1
                 && mouseY >= this.topPos + CONSOLE_Y0 && mouseY <= this.topPos + CONSOLE_Y1) {

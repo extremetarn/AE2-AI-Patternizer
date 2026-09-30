@@ -150,6 +150,22 @@ public class ApiSettingsScreen extends Screen {
     }
 
     @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // 任意输入框聚焦时吞掉除 ESC 外的按键（屏蔽游戏快捷键）
+        if (keyCode == 256) {
+            this.onClose();
+            return true;
+        }
+        for (EditBox box : new EditBox[] { this.baseUrlBox, this.apiKeyBox, this.modelBox }) {
+            if (box != null && box.canConsumeInput()) {
+                box.keyPressed(keyCode, scanCode, modifiers);
+                return true;
+            }
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (isOnScrollbar(mouseX, mouseY)) {
             this.draggingScrollbar = true;
