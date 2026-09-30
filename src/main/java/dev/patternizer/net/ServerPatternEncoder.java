@@ -95,9 +95,13 @@ public final class ServerPatternEncoder {
             return new String[] { "encode_failed", e.getClass().getSimpleName() };
         }
         if (resolution instanceof RecipeResolver.Resolution.ChooseRecipe choose) {
-            // 多配方冲突：不猜，把候选配方 id 回给客户端选择（§10.5），空白样板已退/未扣
+            // 多条有效路线：把全量配方选项回给客户端挑选（v0.11 全量枚举），空白样板已退/未扣
             refundBlankPattern(grid, player, storage, blankPattern, blankFromGrid, source);
-            return new String[] { "choose_recipe", String.join("\n", choose.recipeIds()) };
+            List<String> lines = new ArrayList<>();
+            for (RecipeResolver.Option option : choose.options()) {
+                lines.add(option.serialize());
+            }
+            return new String[] { "choose_recipe", String.join("\n", lines) };
         }
         if (resolution instanceof RecipeResolver.Resolution.Failed failed) {
             LOGGER.warn("encodeFromSpec failed [{}] {} for target={} type={}",
@@ -106,7 +110,6 @@ public final class ServerPatternEncoder {
             return new String[] { failed.code(), failed.detail() };
         }
         ItemStack encoded = ((RecipeResolver.Resolution.Encoded) resolution).stack();
-        PatternSpec.Type actualType = ((RecipeResolver.Resolution.Encoded) resolution).actualType();
 
         // ③ 消耗空白样板
         if (!blankFromGrid) {
@@ -126,10 +129,6 @@ public final class ServerPatternEncoder {
             } else {
                 player.getInventory().placeItemBackInInventory(encoded);
             }
-        }
-        // 跨类型回退命中时告知玩家（双子物质案：crafting → smithing）
-        if (actualType != spec.type) {
-            return new String[] { "ok", "type_changed:" + actualType.name() };
         }
         return new String[] { "ok", spec.note };
     }

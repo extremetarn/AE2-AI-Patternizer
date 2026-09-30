@@ -163,14 +163,23 @@ public class EncodeGameTest {
         helper.succeed();
     }
 
-    /** M3：切石样板（石头 → 石砖）。 */
+    /** v0.11：全量枚举——石砖有合成与切石两条路线，应返回选项清单，选切石后编码。 */
     @GameTest(template = "empty")
     public static void stonecuttingViaResolver(GameTestHelper helper) {
         PatternSpec spec = targetSpec(PatternSpec.Type.STONECUTTING, "minecraft:stone_bricks");
         var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
-        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.Encoded,
-                "expected Encoded but got " + resolution);
-        ItemStack encoded = ((RecipeResolver.Resolution.Encoded) resolution).stack();
+        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.ChooseRecipe,
+                "expected ChooseRecipe (crafting+stonecutting routes) but got " + resolution);
+        var options = ((RecipeResolver.Resolution.ChooseRecipe) resolution).options();
+        var stonecutting = options.stream()
+                .filter(o -> o.kind() == RecipeResolver.Kind.STONECUTTING).findFirst();
+        helper.assertTrue(stonecutting.isPresent(), "no stonecutting option in " + options);
+
+        spec.recipeId = stonecutting.get().recipeId();
+        var second = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
+        helper.assertTrue(second instanceof RecipeResolver.Resolution.Encoded,
+                "expected Encoded after choosing stonecutting but got " + second);
+        ItemStack encoded = ((RecipeResolver.Resolution.Encoded) second).stack();
         var details = PatternDetailsHelper.decodePattern(encoded, helper.getLevel());
         helper.assertTrue(details != null, "decodePattern returned null");
         helper.assertTrue(details.getPrimaryOutput().what() instanceof AEItemKey key
@@ -210,27 +219,60 @@ public class EncodeGameTest {
         helper.succeed();
     }
 
-    /** 回归（双子物质案）：请求 crafting 但实际是锻造配方时跨类型回退命中。 */
+    /** v0.11：机器配方枚举——AE2 工程处理器（ae2:inscriber 类型）应识别为 MACHINE 路线
+     * 并转处理样板编码（配料含红石）。 */
     @GameTest(template = "empty")
-    public static void crossTypeFallback(GameTestHelper helper) {
-        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:netherite_sword");
+    public static void machineRecipeBecomesProcessing(GameTestHelper helper) {
+        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "ae2:engineering_processor");
+        var options = RecipeResolver.enumerate(helper.getLevel().getServer(), helper.getLevel(),
+                "ae2:engineering_processor");
+        helper.assertFalse(options.isEmpty(), "no routes enumerated for engineering_processor");
+        helper.assertTrue(options.stream().anyMatch(o -> o.kind() == RecipeResolver.Kind.MACHINE),
+                "expected a MACHINE route (ae2:inscriber) in " + options);
+
         var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
-        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.Encoded enc
-                && enc.actualType() == PatternSpec.Type.SMITHING,
-                "expected SMITHING fallback but got " + resolution);
+        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.Encoded
+                || resolution instanceof RecipeResolver.Resolution.ChooseRecipe,
+                "expected Encoded or ChooseRecipe but got " + resolution);
+        // 单路线直接编码；多路线则选机器路线
+        ItemStack encoded;
+        if (resolution instanceof RecipeResolver.Resolution.Encoded enc) {
+            encoded = enc.stack();
+        } else {
+            var machine = ((RecipeResolver.Resolution.ChooseRecipe) resolution).options().stream()
+                    .filter(o -> o.kind() == RecipeResolver.Kind.MACHINE).findFirst().orElseThrow();
+            spec.recipeId = machine.recipeId();
+            var second = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(),
+                    spec);
+            helper.assertTrue(second instanceof RecipeResolver.Resolution.Encoded,
+                    "expected Encoded after choosing machine route but got " + second);
+            encoded = ((RecipeResolver.Resolution.Encoded) second).stack();
+        }
+        var details = PatternDetailsHelper.decodePattern(encoded, helper.getLevel());
+        helper.assertTrue(details != null, "decodePattern returned null");
+        boolean hasRedstone = false;
+        for (var input : details.getInputs()) {
+            for (var stack : input.getPossibleInputs()) {
+                if (stack.what() instanceof AEItemKey key && key.getItem() == Items.REDSTONE) {
+                    hasRedstone = true;
+                }
+            }
+        }
+        helper.assertTrue(hasRedstone, "processing pattern from inscriber recipe should contain redstone");
         helper.succeed();
     }
 
     /** M3：多配方冲突（苔石：圆石+藤蔓 / 圆石+苔藓块）→ 返回候选清单，选定后精确编码。 */
     @GameTest(template = "empty")
-    public static void chooseRecipeWhenMultiple(GameTestHelper helper) {        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:mossy_cobblestone");
+    public static void chooseRecipeWhenMultiple(GameTestHelper helper) {
+        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:mossy_cobblestone");
         var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
         helper.assertTrue(resolution instanceof RecipeResolver.Resolution.ChooseRecipe,
                 "expected ChooseRecipe but got " + resolution);
-        var ids = ((RecipeResolver.Resolution.ChooseRecipe) resolution).recipeIds();
-        helper.assertTrue(ids.size() >= 2, "expected >=2 candidate recipes but got " + ids);
+        var options = ((RecipeResolver.Resolution.ChooseRecipe) resolution).options();
+        helper.assertTrue(options.size() >= 2, "expected >=2 candidate recipes but got " + options);
 
-        spec.recipeId = ids.get(0);
+        spec.recipeId = options.get(0).recipeId();
         var second = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
         helper.assertTrue(second instanceof RecipeResolver.Resolution.Encoded,
                 "expected Encoded after choosing a recipe but got " + second);

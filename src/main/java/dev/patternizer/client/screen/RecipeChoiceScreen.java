@@ -29,14 +29,25 @@ public class RecipeChoiceScreen extends Screen {
 
     private final Screen parent;
     private final PatternSpec spec;
-    private final List<String> recipeIds;
+    private final List<dev.patternizer.net.RecipeResolver.Option> options;
     private int scrollOffset;
 
-    public RecipeChoiceScreen(Screen parent, PatternSpec spec, List<String> recipeIds) {
+    public RecipeChoiceScreen(Screen parent, PatternSpec spec, List<String> optionLines) {
         super(Component.translatable("gui.aipatternizer.choice.title"));
         this.parent = parent;
         this.spec = spec;
-        this.recipeIds = recipeIds;
+        this.options = optionLines.stream().map(dev.patternizer.net.RecipeResolver.Option::deserialize)
+                .toList();
+    }
+
+    /** 行标签：原版类型给中文类别，机器配方给配方类型 id（v0.11）。 */
+    private String optionLabel(dev.patternizer.net.RecipeResolver.Option option) {
+        return switch (option.kind()) {
+        case CRAFTING -> "[合成] " + option.recipeId();
+        case STONECUTTING -> "[切石] " + option.recipeId();
+        case SMITHING -> "[锻造] " + option.recipeId();
+        case MACHINE -> "[" + option.recipeTypeId() + "] " + option.recipeId();
+        };
     }
 
     private int listBottom() {
@@ -48,7 +59,7 @@ public class RecipeChoiceScreen extends Screen {
     }
 
     private int maxOffset() {
-        return Math.max(0, this.recipeIds.size() - visibleRows());
+        return Math.max(0, this.options.size() - visibleRows());
     }
 
     private int listX0() {
@@ -79,8 +90,8 @@ public class RecipeChoiceScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (mouseX >= listX0() && mouseX <= listX1() && mouseY >= LIST_TOP && mouseY < listBottom()) {
             int idx = this.scrollOffset + (int) (mouseY - LIST_TOP) / ROW_H;
-            if (idx >= 0 && idx < this.recipeIds.size()) {
-                choose(this.recipeIds.get(idx));
+            if (idx >= 0 && idx < this.options.size()) {
+                choose(this.options.get(idx).recipeId());
             }
             return true;
         }
@@ -126,26 +137,26 @@ public class RecipeChoiceScreen extends Screen {
 
         this.scrollOffset = clamp(this.scrollOffset, 0, maxOffset());
         int visible = visibleRows();
-        int end = Math.min(this.recipeIds.size(), this.scrollOffset + visible);
+        int end = Math.min(this.options.size(), this.scrollOffset + visible);
         for (int i = this.scrollOffset; i < end; i++) {
             int rowY = LIST_TOP + (i - this.scrollOffset) * ROW_H;
             boolean hovered = mouseX >= listX0() && mouseX <= listX1() && mouseY >= rowY && mouseY < rowY + ROW_H;
             if (hovered) {
                 graphics.fill(listX0(), rowY, listX1(), rowY + ROW_H - 1, 0x33FFFFFF);
             }
-            graphics.drawString(this.font, this.recipeIds.get(i), listX0() + 4, rowY + 2, 0xFFFFFFFF, false);
+            graphics.drawString(this.font, optionLabel(this.options.get(i)), listX0() + 4, rowY + 2, 0xFFFFFFFF, false);
         }
 
-        if (this.recipeIds.size() > visible) {
+        if (this.options.size() > visible) {
             int trackX = listX1() + 2;
             int trackH = listBottom() - LIST_TOP;
             graphics.fill(trackX, LIST_TOP, trackX + 5, listBottom(), 0xFF2A2A2A);
-            int thumbH = Math.max(12, trackH * visible / this.recipeIds.size());
+            int thumbH = Math.max(12, trackH * visible / this.options.size());
             int thumbY = LIST_TOP
-                    + (trackH - thumbH) * this.scrollOffset / Math.max(1, this.recipeIds.size() - visible);
+                    + (trackH - thumbH) * this.scrollOffset / Math.max(1, this.options.size() - visible);
             graphics.fill(trackX, thumbY, trackX + 5, thumbY + thumbH, 0xFF9A9A9A);
             graphics.drawString(this.font,
-                    Component.literal((this.scrollOffset + 1) + "-" + end + " / " + this.recipeIds.size()),
+                    Component.literal((this.scrollOffset + 1) + "-" + end + " / " + this.options.size()),
                     listX0() + 4, listBottom() - 10, 0xFFAAAAAA, false);
         }
     }

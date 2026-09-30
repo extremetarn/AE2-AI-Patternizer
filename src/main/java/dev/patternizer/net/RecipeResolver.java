@@ -1,11 +1,12 @@
 package dev.patternizer.net;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.Container;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingRecipe;
@@ -14,31 +15,52 @@ import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.item.crafting.SmithingRecipe;
+import net.minecraft.world.item.crafting.SmithingTrimRecipe;
 import net.minecraft.world.item.crafting.StonecutterRecipe;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
 import dev.patternizer.spec.CatalystLayout;
 import dev.patternizer.spec.PatternSpec;
 
 /**
- * 配方解析与编码（§6）：按 spec 的 target 在服务端 RecipeManager 反查真实配方并编码。
- * - 单一匹配 → 直接编码；
- * - 多匹配（§10.5 不猜原则）→ 返回候选配方 id 清单，由客户端选择后带 recipeId 重发；
- * - 无匹配 → recipe_not_found。
- * crafting 同时处理 ShapedRecipe 的九宫格布局（M2 是顺序填充，对有形状配方不准确）。
+ * 配方枚举与编码（v0.11 全量枚举版，取代 M3 的类型猜测与跨类型回退）。
+ *
+ * 流程：AI 选定目标 → 遍历全部配方类型（含模组机器配方）找出所有产出该物品的配方 →
+ * 有效性过滤（纹饰/动态改性剔除）→ 0/1/N 分流 → 按所选配方编码：
+ * 原版类型走原生样板，机器类型转处理样板。
  */
 public final class RecipeResolver {
 
-    public sealed interface Resolution {
-        /** actualType 可能与 spec.type 不同（跨类型回退命中，见 resolveAndEncode）。 */
-        record Encoded(ItemStack stack, PatternSpec.Type actualType) implements Resolution {
+    /** 配方路线的类别。 */
+    public enum Kind {
+        CRAFTING, STONECUTTING, SMITHING, MACHINE
+    }
+
+    /** 一条可编码的配方选项。 */
+    public record Option(String recipeId, String recipeTypeId, Kind kind) {
+
+        /** 选择界面/回传用的序列化行：recipeId|recipeTypeId|kind */
+        public String serialize() {
+            return recipeId + "|" + recipeTypeId + "|" + kind.name();
         }
 
-        /** 多个配方产出同一目标：候选配方 id 清单，等玩家选择。 */
-        record ChooseRecipe(List<String> recipeIds) implements Resolution {
+        public static Option deserialize(String line) {
+            String[] parts = line.split("\\|", -1);
+            return new Option(parts[0], parts.length > 1 ? parts[1] : "minecraft:crafting",
+                    parts.length > 2 ? Kind.valueOf(parts[2]) : Kind.CRAFTING);
+        }
+    }
+
+    public sealed interface Resolution {
+        record Encoded(ItemStack stack, String recipeTypeId) implements Resolution {
+        }
+
+        /** 多条有效路线：全量配方选项，等玩家挑选（v0.11）。 */
+        record ChooseRecipe(List<Option> options) implements Resolution {
         }
 
         record Failed(String code, String detail) implements Resolution {
@@ -52,93 +74,132 @@ public final class RecipeResolver {
         if (spec.type == PatternSpec.Type.PROCESSING) {
             return new Resolution.Encoded(PatternDetailsHelper.encodeProcessingPattern(
                     CatalystLayout.buildInputs(spec), CatalystLayout.buildOutputs(spec)),
-                    PatternSpec.Type.PROCESSING);
+                    "processing");
         }
-        Resolution primary = encodeByType(server, level, spec, spec.type);
-        // 跨类型回退（双子物质案：augment 是锻造台配方，AI 却给了 crafting）：
-        // 请求类型查无配方且未指定 recipeId 时，依次尝试其余类型
-        boolean notFound = primary instanceof Resolution.Failed f
-                && "recipe_not_found".equals(f.code());
-        if (!notFound || spec.recipeId != null) {
-            return primary;
-        }
-        for (PatternSpec.Type fallback : new PatternSpec.Type[] {
-                PatternSpec.Type.CRAFTING, PatternSpec.Type.SMITHING, PatternSpec.Type.STONECUTTING }) {
-            if (fallback == spec.type) {
-                continue;
+
+        // 玩家已指定具体配方（选择界面回传）：全类型按 id 精确编码
+        if (spec.recipeId != null && !spec.recipeId.isBlank()) {
+            Recipe<?> recipe = findById(server, level, spec.recipeId);
+            if (recipe == null) {
+                return new Resolution.Failed("recipe_not_found", spec.recipeId);
             }
-            Resolution r = encodeByType(server, level, spec, fallback);
-            if (r instanceof Resolution.Encoded || r instanceof Resolution.ChooseRecipe) {
-                return r;
-            }
+            return encodeRecipe(level, recipe, spec);
         }
-        return primary;
+
+        // 全量枚举（v0.11 原则：不走捷径）
+        List<Option> options = enumerate(server, level, spec.target);
+        if (options.isEmpty()) {
+            return new Resolution.Failed("recipe_not_found", spec.target);
+        }
+        if (options.size() > 1) {
+            return new Resolution.ChooseRecipe(options);
+        }
+        Recipe<?> recipe = findById(server, level, options.get(0).recipeId());
+        if (recipe == null) {
+            return new Resolution.Failed("recipe_not_found", spec.target);
+        }
+        return encodeRecipe(level, recipe, spec);
     }
 
-    private static net.minecraft.world.item.crafting.RecipeType<?> recipeTypeOf(PatternSpec.Type type) {
-        return switch (type) {
-        case CRAFTING -> net.minecraft.world.item.crafting.RecipeType.CRAFTING;
-        case STONECUTTING -> net.minecraft.world.item.crafting.RecipeType.STONECUTTING;
-        case SMITHING -> net.minecraft.world.item.crafting.RecipeType.SMITHING;
-        default -> throw new IllegalArgumentException("no recipe type for " + type);
-        };
+    /**
+     * 全量枚举目标物品的全部有效制造路线。
+     * 遍历 ForgeRegistries.RECIPE_TYPES（含模组机器配方类型）。
+     */
+    public static List<Option> enumerate(MinecraftServer server, Level level, String targetId) {
+        List<Option> out = new ArrayList<>();
+        Item target = ForgeRegistries.ITEMS.getValue(new ResourceLocation(targetId));
+        if (target == null) {
+            return out;
+        }
+        for (RecipeType<?> type : ForgeRegistries.RECIPE_TYPES) {
+            ResourceLocation typeKey = ForgeRegistries.RECIPE_TYPES.getKey(type);
+            String typeId = typeKey != null ? typeKey.toString() : "unknown:unknown";
+            Kind kind = classify(type);
+            for (Recipe<?> recipe : allOf(server, type)) {
+                if (!isValidRoute(recipe, level, target)) {
+                    continue;
+                }
+                out.add(new Option(recipe.getId().toString(), typeId, kind));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * 有效性过滤（v0.11「无效配方」剔除）：
+     * - 结果为空或与目标不符（动态配方常见）；
+     * - SmithingTrimRecipe 纹饰（同物品改性，不产出新物，玩家眼中的「附魔配方」）；
+     * - crafting_special_* 动态配方（烟花/染色/地图复制等，无法编码为静态样板）。
+     */
+    private static boolean isValidRoute(Recipe<?> recipe, Level level, Item target) {
+        ItemStack result = recipe.getResultItem(level.registryAccess());
+        if (result.isEmpty() || result.getItem() != target) {
+            return false;
+        }
+        if (recipe instanceof SmithingTrimRecipe) {
+            return false;
+        }
+        ResourceLocation serializerId = ForgeRegistries.RECIPE_SERIALIZERS.getKey(recipe.getSerializer());
+        if (serializerId != null && serializerId.getPath().startsWith("crafting_special")) {
+            return false;
+        }
+        return true;
+    }
+
+    private static Kind classify(RecipeType<?> type) {
+        if (type == RecipeType.CRAFTING) {
+            return Kind.CRAFTING;
+        }
+        if (type == RecipeType.STONECUTTING) {
+            return Kind.STONECUTTING;
+        }
+        if (type == RecipeType.SMITHING) {
+            return Kind.SMITHING;
+        }
+        return Kind.MACHINE;
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private static Resolution encodeByType(MinecraftServer server, Level level, PatternSpec spec,
-            PatternSpec.Type type) {
-        Item target = ForgeRegistries.ITEMS.getValue(new ResourceLocation(spec.target));
-        if (target == null) {
-            return new Resolution.Failed("recipe_not_found", spec.target);
-        }
-
-        List<? extends Recipe<?>> all = (List) server.getRecipeManager()
-                .getAllRecipesFor((RecipeType) recipeTypeOf(type));
-        List<Recipe<?>> matches = new ArrayList<>();
-        for (Recipe<?> recipe : all) {
-            if (recipe.getResultItem(level.registryAccess()).getItem() == target) {
-                matches.add(recipe);
-            }
-        }
-        if (matches.isEmpty()) {
-            return new Resolution.Failed("recipe_not_found", spec.target);
-        }
-
-        Recipe<?> chosen = null;
-        if (spec.recipeId != null && !spec.recipeId.isBlank()) {
-            for (Recipe<?> recipe : matches) {
-                if (recipe.getId().toString().equals(spec.recipeId)) {
-                    chosen = recipe;
-                    break;
-                }
-            }
-            if (chosen == null) {
-                return new Resolution.Failed("recipe_not_found", spec.recipeId);
-            }
-        } else if (matches.size() > 1) {
-            return new Resolution.ChooseRecipe(matches.stream().map(r -> r.getId().toString()).toList());
-        } else {
-            chosen = matches.get(0);
-        }
-
-        ItemStack encoded = encodeOne(level, chosen, spec);
-        if (encoded == null) {
-            return new Resolution.Failed("unsupported_type", chosen.getId().toString());
-        }
-        return new Resolution.Encoded(encoded, type);
+    private static List<? extends Recipe<?>> allOf(MinecraftServer server, RecipeType<?> type) {
+        return (List) server.getRecipeManager().getAllRecipesFor((RecipeType) type);
     }
 
-    private static ItemStack encodeOne(Level level, Recipe<?> recipe, PatternSpec spec) {
-        if (recipe instanceof CraftingRecipe crafting) {
-            return encodeCrafting(level, crafting, spec);
-        }
-        if (recipe instanceof StonecutterRecipe stonecutting) {
-            return encodeStonecutting(level, stonecutting, spec);
-        }
-        if (recipe instanceof SmithingRecipe smithing) {
-            return encodeSmithing(level, smithing, spec);
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private static Recipe<?> findById(MinecraftServer server, Level level, String recipeId) {
+        ResourceLocation id = new ResourceLocation(recipeId);
+        for (RecipeType<?> type : ForgeRegistries.RECIPE_TYPES) {
+            for (Recipe<?> recipe : (List<Recipe<?>>) (List) server.getRecipeManager()
+                    .getAllRecipesFor((RecipeType) type)) {
+                if (recipe.getId().equals(id)) {
+                    return recipe;
+                }
+            }
         }
         return null;
+    }
+
+    /** 按配方类别编码：原版类型走原生样板，机器类型转处理样板。 */
+    private static Resolution encodeRecipe(Level level, Recipe<?> recipe, PatternSpec spec) {
+        if (recipe instanceof CraftingRecipe crafting) {
+            return new Resolution.Encoded(encodeCrafting(level, crafting, spec), "minecraft:crafting");
+        }
+        if (recipe instanceof StonecutterRecipe stonecutting) {
+            ItemStack encoded = encodeStonecutting(level, stonecutting, spec);
+            return encoded != null
+                    ? new Resolution.Encoded(encoded, "minecraft:stonecutting")
+                    : new Resolution.Failed("unsupported_type", recipe.getId().toString());
+        }
+        if (recipe instanceof SmithingRecipe smithing) {
+            ItemStack encoded = encodeSmithing(level, smithing, spec);
+            return encoded != null
+                    ? new Resolution.Encoded(encoded, "minecraft:smithing")
+                    : new Resolution.Failed("unsupported_type", recipe.getId().toString());
+        }
+        ItemStack encoded = encodeMachineRecipe(level, recipe);
+        return encoded != null
+            ? new Resolution.Encoded(encoded,
+                    ForgeRegistries.RECIPE_TYPES.getKey(recipe.getType()).toString())
+            : new Resolution.Failed("unsupported_type", recipe.getId().toString());
     }
 
     private static ItemStack encodeCrafting(Level level, CraftingRecipe recipe, PatternSpec spec) {
@@ -195,6 +256,35 @@ public final class RecipeResolver {
         return PatternDetailsHelper.encodeSmithingTablePattern(recipe,
                 AEItemKey.of(templateStack), AEItemKey.of(baseStack), AEItemKey.of(additionStack),
                 AEItemKey.of(out), spec.allowSubstitutes);
+    }
+
+    /**
+     * 机器配方 → 处理样板（v0.11）。
+     * 配料取 getIngredients() 首个变体（原版优先）并按物品合并计数；
+     * 产物取 getResultItem。流体配料 v1 未导入（§10.19 待桥接 mod）。
+     */
+    private static ItemStack encodeMachineRecipe(Level level, Recipe<?> recipe) {
+        Map<Item, Integer> inputs = new LinkedHashMap<>();
+        for (Ingredient ingredient : recipe.getIngredients()) {
+            ItemStack stack = firstStack(ingredient);
+            if (!stack.isEmpty()) {
+                inputs.merge(stack.getItem(), stack.getCount(), Integer::sum);
+            }
+        }
+        ItemStack out = recipe.getResultItem(level.registryAccess()).copy();
+        if (inputs.isEmpty() || out.isEmpty()) {
+            return null;
+        }
+        if (inputs.size() + 1 > dev.patternizer.spec.PatternSpecValidator.MAX_PROCESSING_SLOTS) {
+            return null;
+        }
+        GenericStack[] in = new GenericStack[inputs.size()];
+        int i = 0;
+        for (Map.Entry<Item, Integer> e : inputs.entrySet()) {
+            in[i++] = new GenericStack(AEItemKey.of(new ItemStack(e.getKey())), e.getValue());
+        }
+        GenericStack[] outs = new GenericStack[] { new GenericStack(AEItemKey.of(out), out.getCount()) };
+        return PatternDetailsHelper.encodeProcessingPattern(in, outs);
     }
 
     /** 用 isXxxIngredient 谓词在注册表中反查该槽位的第一个代表物品（原版优先）。 */
