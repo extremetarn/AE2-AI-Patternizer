@@ -79,6 +79,28 @@ public final class ItemCandidateSearch {
                         + String.format(java.util.Locale.ROOT, "%.1f", idf.get(e.getKey())) + ")")
                 .collect(java.util.stream.Collectors.joining(" ")));
 
+        // 定案探针：df=0 的拉丁 token（任何名称源都没命中）时，采样同首字母命名空间的
+        // 物品实际显示名——用于判断是语言问题还是匹配逻辑问题（2026-10-01 ATM 案）
+        for (String token : latinTokens) {
+            if (df.getOrDefault(token, 0) == 0 && !token.isEmpty()) {
+                char first = Character.toLowerCase(token.charAt(0));
+                List<String> samples = new ArrayList<>();
+                for (Item item : ForgeRegistries.ITEMS) {
+                    var id = ForgeRegistries.ITEMS.getKey(item);
+                    if (id == null || id.getNamespace().isEmpty()
+                            || id.getNamespace().charAt(0) != first) {
+                        continue;
+                    }
+                    samples.add(id + "->"
+                            + item.getDefaultInstance().getHoverName().getString());
+                    if (samples.size() >= 5) {
+                        break;
+                    }
+                }
+                LOGGER.info("[aipatternizer] search probe: token '{}' df=0, samples: {}", token, samples);
+            }
+        }
+
         // 第二遍：按字段加权的相关度打分
         record Scored(String id, double score) {
         }
