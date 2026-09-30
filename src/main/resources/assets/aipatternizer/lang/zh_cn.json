@@ -10,6 +10,11 @@
   "gui.aipatternizer.status.empty_prompt": "请先输入你的需求。",
   "gui.aipatternizer.status.calling": "正在调用模型，请稍候……",
   "gui.aipatternizer.status.failed": "失败：%s",
+  "gui.aipatternizer.fail.no_key": "失败：未配置 API Key，点右上角齿轮进行设置。",
+  "gui.aipatternizer.fail.io": "失败：网络错误或请求超时（%s）。请检查端点、网络或代理。",
+  "gui.aipatternizer.fail.http": "失败：API 返回 HTTP %s。请检查 Key、模型名或端点配额。",
+  "gui.aipatternizer.fail.llm_other": "失败：LLM 错误：%s",
+  "gui.aipatternizer.fail.spec": "失败：AI 输出未通过校验：%s",
 
   "gui.aipatternizer.preview.title": "预览（确认后编码）：",
   "gui.aipatternizer.preview.crafting_target": "合成样板，目标：%s",

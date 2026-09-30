@@ -162,11 +162,36 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
             } else if (result instanceof LlmGenerateService.Result.Failed failed) {
                 setState(State.INPUT);
                 for (String line : failed.errorLines()) {
-                    this.statusLines.add(Component.translatable("gui.aipatternizer.status.failed", line));
+                    this.statusLines.add(describeError(line));
                 }
                 rebuildDisplay();
             }
         }));
+    }
+
+    /** 把内部错误码翻译成玩家能懂的提示（§失败要可解释）。 */
+    private Component describeError(String line) {
+        if (line.startsWith("error.llm.no_api_key")) {
+            return Component.translatable("gui.aipatternizer.fail.no_key");
+        }
+        if (line.startsWith("error.llm.io|")) {
+            return Component.translatable("gui.aipatternizer.fail.io",
+                    line.substring("error.llm.io|".length()));
+        }
+        if (line.startsWith("error.llm.http|")) {
+            return Component.translatable("gui.aipatternizer.fail.http",
+                    line.substring("error.llm.http|".length()));
+        }
+        if (line.startsWith("error.llm.")) {
+            return Component.translatable("gui.aipatternizer.fail.llm_other", line);
+        }
+        // error.spec.*：首段是 lang key，其余是参数（空格或 | 分隔）
+        String normalized = line.replace('|', ' ');
+        String[] parts = normalized.split(" ", 2);
+        String detail = parts.length > 1
+                ? Component.translatable(parts[0], (Object[]) parts[1].split(" ")).getString()
+                : parts[0];
+        return Component.translatable("gui.aipatternizer.fail.spec", detail);
     }
 
     private void confirmEncode() {

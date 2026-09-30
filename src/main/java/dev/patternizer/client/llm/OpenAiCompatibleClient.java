@@ -35,6 +35,15 @@ public final class OpenAiCompatibleClient {
         return body.length() <= 300 ? body : body.substring(0, 300) + "...";
     }
 
+    /** 沿 cause 链走到最内层，返回根因异常名（避免显示 CompletionException 这类外壳）。 */
+    private static String rootCauseName(Throwable error) {
+        Throwable t = error;
+        while (t.getCause() != null) {
+            t = t.getCause();
+        }
+        return t.getClass().getSimpleName();
+    }
+
     /** 一条对话消息。 */
     public record Message(String role, String content) {
     }
@@ -170,7 +179,7 @@ public final class OpenAiCompatibleClient {
                     if (error != null) {
                         LOGGER.warn("[aipatternizer] LLM request IO error: {}", error.toString());
                         retryOrFail(messages, backoffAttempt, future,
-                                new LlmException("error.llm.io|" + error.getClass().getSimpleName(), true));
+                                new LlmException("error.llm.io|" + rootCauseName(error), true));
                         return;
                     }
                     int status = response.statusCode();

@@ -10,6 +10,11 @@
   "gui.aipatternizer.status.empty_prompt": "Type what you need first.",
   "gui.aipatternizer.status.calling": "Calling the model, please wait...",
   "gui.aipatternizer.status.failed": "Failed: %s",
+  "gui.aipatternizer.fail.no_key": "Failed: API key not configured - click the gear (top right) to set it.",
+  "gui.aipatternizer.fail.io": "Failed: network error / request timed out (%s). Check endpoint, network or proxy.",
+  "gui.aipatternizer.fail.http": "Failed: API returned HTTP %s. Check the key, model name or endpoint quota.",
+  "gui.aipatternizer.fail.llm_other": "Failed: LLM error: %s",
+  "gui.aipatternizer.fail.spec": "Failed: AI output failed validation: %s",
 
   "gui.aipatternizer.preview.title": "Preview (confirm to encode):",
   "gui.aipatternizer.preview.crafting_target": "Crafting pattern for: %s",
