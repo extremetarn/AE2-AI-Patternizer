@@ -8,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -70,6 +71,53 @@ public final class OpenAiCompatibleClient {
     public CompletableFuture<String> chatComplete(List<Message> messages) {
         CompletableFuture<String> future = new CompletableFuture<>();
         sendWithBackoff(messages, 0, future);
+        return future;
+    }
+
+    /** 拉取可用模型列表（GET {baseUrl}/models），同时兼作连接测试。 */
+    public CompletableFuture<List<String>> fetchModels() {
+        CompletableFuture<List<String>> future = new CompletableFuture<>();
+        String apiKey = PatternizerClientConfig.API_KEY.get().trim();
+        if (apiKey.isEmpty()) {
+            future.completeExceptionally(new LlmException("error.llm.no_api_key", false));
+            return future;
+        }
+        String baseUrl = PatternizerClientConfig.BASE_URL.get().trim();
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/models"))
+                .timeout(Duration.ofSeconds(PatternizerClientConfig.TIMEOUT_SECONDS.get()))
+                .header("Authorization", "Bearer " + apiKey)
+                .GET()
+                .build();
+
+        http.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .whenComplete((response, error) -> {
+                    if (error != null) {
+                        future.completeExceptionally(
+                                new LlmException("error.llm.io|" + error.getClass().getSimpleName(), true));
+                        return;
+                    }
+                    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                        future.completeExceptionally(
+                                new LlmException("error.llm.http|" + response.statusCode(), false));
+                        return;
+                    }
+                    try {
+                        List<String> models = new ArrayList<>();
+                        for (var el : JsonParser.parseString(response.body())
+                                .getAsJsonObject().getAsJsonArray("data")) {
+                            models.add(el.getAsJsonObject().get("id").getAsString());
+                        }
+                        models.sort(String::compareTo);
+                        future.complete(models);
+                    } catch (Exception e) {
+                        future.completeExceptionally(
+                                new LlmException("error.llm.bad_response|" + e.getClass().getSimpleName(), false));
+                    }
+                });
         return future;
     }
 

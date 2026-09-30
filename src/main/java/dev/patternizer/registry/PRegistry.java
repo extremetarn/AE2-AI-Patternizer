@@ -4,6 +4,7 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
@@ -12,6 +13,7 @@ import net.minecraftforge.registries.RegistryObject;
 
 import dev.patternizer.AIPatternizer;
 import dev.patternizer.block.AiPatternizerBlock;
+import dev.patternizer.block.AiPatternizerBlockEntity;
 import dev.patternizer.menu.AiPatternizerMenu;
 
 public final class PRegistry {
@@ -21,6 +23,8 @@ public final class PRegistry {
             AIPatternizer.MOD_ID);
     public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(ForgeRegistries.MENU_TYPES,
             AIPatternizer.MOD_ID);
+    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister
+            .create(ForgeRegistries.BLOCK_ENTITY_TYPES, AIPatternizer.MOD_ID);
 
     public static final RegistryObject<Block> AI_PATTERNIZER = BLOCKS.register("ai_patternizer",
             AiPatternizerBlock::new);
@@ -33,6 +37,12 @@ public final class PRegistry {
             () -> IForgeMenuType
                     .create((windowId, inv, data) -> new AiPatternizerMenu(windowId, inv, data.readBlockPos())));
 
+    public static final RegistryObject<BlockEntityType<AiPatternizerBlockEntity>> AI_PATTERNIZER_BE = BLOCK_ENTITIES
+            .register("ai_patternizer",
+                    () -> BlockEntityType.Builder
+                            .of(AiPatternizerBlockEntity::new, AI_PATTERNIZER.get())
+                            .build(null));
+
     private PRegistry() {
     }
 
@@ -40,5 +50,6 @@ public final class PRegistry {
         BLOCKS.register(modBus);
         ITEMS.register(modBus);
         MENUS.register(modBus);
+        BLOCK_ENTITIES.register(modBus);
     }
 }

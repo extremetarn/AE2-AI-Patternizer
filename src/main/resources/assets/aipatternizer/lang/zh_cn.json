@@ -28,6 +28,13 @@
   "gui.aipatternizer.config.api_key": "API Key（仅存本地）",
   "gui.aipatternizer.config.model": "模型",
   "gui.aipatternizer.config.key_hint": "API Key 只保存在客户端配置文件中，绝不会发送给游戏服务器。",
+  "gui.aipatternizer.config.fetch": "拉取模型列表",
+  "gui.aipatternizer.config.fetching": "正在拉取模型列表……",
+  "gui.aipatternizer.config.fetch_ok": "已拉取 %s 个模型，点击下方名称进行选择。",
+  "gui.aipatternizer.config.fetch_empty": "连接成功，但端点没有返回任何模型。",
+  "gui.aipatternizer.config.fetch_fail": "拉取失败：%s",
+  "gui.aipatternizer.config.models_title": "可用模型（点击选择）：",
+  "gui.aipatternizer.config.model_selected": "已选择模型：%s",
 
   "message.aipatternizer.encode.ok": "[AI 样板编写台] 样板编码完成。",
   "message.aipatternizer.encode.no_blank_pattern": "[AI 样板编写台] 请先在左侧槽位放入空白样板。",

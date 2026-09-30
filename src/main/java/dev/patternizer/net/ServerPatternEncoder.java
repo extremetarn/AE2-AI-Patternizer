@@ -14,7 +14,11 @@ import net.minecraftforge.items.ItemStackHandler;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import appeng.api.crafting.PatternDetailsHelper;
+import appeng.api.networking.IGrid;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
+import dev.patternizer.block.AiPatternizerBlockEntity;
 import dev.patternizer.menu.AiPatternizerMenu;
 import dev.patternizer.spec.CatalystLayout;
 import dev.patternizer.spec.PatternSpec;
@@ -24,9 +28,8 @@ import dev.patternizer.spec.PatternSpecValidator.ValidationError;
 
 /**
  * 服务端样板编码管线（§6）。
- * 流程：解析 → 权威校验（注册表/槽位/催化剂规则）→ 空白样板检查 →
- * AE2 官方 API 编码 → 消耗空白样板 → 产出。
- * M2 支持 processing（含假合成三策略，§6.2）与 crafting（首个匹配配方，M3 做冲突消歧）。
+ * 流程：解析 → 权威校验 → 空白样板获取（网格优先，槽位兜底）→
+ * AE2 官方 API 编码 → 消耗空白样板 → 产出（回写网格优先，槽位/背包兜底）。
  */
 public final class ServerPatternEncoder {
 
@@ -60,10 +63,28 @@ public final class ServerPatternEncoder {
         }
         ItemStackHandler storage = menu.getStorage();
         Item blankPattern = ForgeRegistries.ITEMS.getValue(BLANK_PATTERN_ID);
-        if (blankPattern == null || storage.getStackInSlot(0).getItem() != blankPattern) {
+        if (blankPattern == null) {
             return new String[] { "no_blank_pattern", null };
         }
 
+        // 网格（在线时优先从网络取空白样板、结果回写网络）
+        AiPatternizerBlockEntity blockEntity = menu.getBlockEntity();
+        IGrid grid = blockEntity != null ? blockEntity.getGrid() : null;
+        IActionSource source = blockEntity != null
+                ? IActionSource.ofMachine(blockEntity)
+                : IActionSource.empty();
+
+        // ① 空白样板获取
+        boolean blankFromGrid = false;
+        if (grid != null) {
+            blankFromGrid = GridPatternIO.extract(grid, AEItemKey.of(new ItemStack(blankPattern)), 1,
+                    source) == 1;
+        }
+        if (!blankFromGrid && storage.getStackInSlot(0).getItem() != blankPattern) {
+            return new String[] { "no_blank_pattern", null };
+        }
+
+        // ② 编码
         ItemStack encoded;
         try {
             encoded = switch (spec.type) {
@@ -72,22 +93,49 @@ public final class ServerPatternEncoder {
             default -> null; // STONECUTTING / SMITHING 见 M3
             };
         } catch (Exception e) {
+            refundBlankPattern(grid, player, storage, blankPattern, blankFromGrid, source);
             return new String[] { "encode_failed", e.getClass().getSimpleName() };
         }
         if (encoded == null) {
+            refundBlankPattern(grid, player, storage, blankPattern, blankFromGrid, source);
             return new String[] {
                     spec.type == PatternSpec.Type.CRAFTING ? "recipe_not_found" : "unsupported_type",
                     spec.target
             };
         }
 
-        storage.extractItem(0, 1, false);
-        if (storage.getStackInSlot(1).isEmpty()) {
-            storage.setStackInSlot(1, encoded);
-        } else {
-            player.getInventory().placeItemBackInInventory(encoded);
+        // ③ 消耗空白样板
+        if (!blankFromGrid) {
+            storage.extractItem(0, 1, false);
+        }
+
+        // ④ 产出：网格优先回写，余量进输出槽/背包
+        if (grid != null) {
+            long inserted = GridPatternIO.insert(grid, AEItemKey.of(encoded), encoded.getCount(), source);
+            if (inserted > 0) {
+                encoded.shrink((int) inserted);
+            }
+        }
+        if (!encoded.isEmpty()) {
+            if (storage.getStackInSlot(1).isEmpty()) {
+                storage.setStackInSlot(1, encoded);
+            } else {
+                player.getInventory().placeItemBackInInventory(encoded);
+            }
         }
         return new String[] { "ok", spec.note };
+    }
+
+    /** 编码失败时把已扣的空白样板退回（网格扣的退回网格，槽位未扣则无需操作）。 */
+    private static void refundBlankPattern(IGrid grid, ServerPlayer player, ItemStackHandler storage,
+            Item blankPattern, boolean blankFromGrid, IActionSource source) {
+        if (!blankFromGrid) {
+            return;
+        }
+        if (grid != null && GridPatternIO.insert(grid, AEItemKey.of(new ItemStack(blankPattern)), 1, source) == 1) {
+            return;
+        }
+        player.getInventory().placeItemBackInInventory(new ItemStack(blankPattern));
     }
 
     private static ItemStack encodeProcessing(PatternSpec spec) {

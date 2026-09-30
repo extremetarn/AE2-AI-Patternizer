@@ -28,6 +28,13 @@
   "gui.aipatternizer.config.api_key": "API Key (stored locally only)",
   "gui.aipatternizer.config.model": "Model",
   "gui.aipatternizer.config.key_hint": "The API key is stored in the client config file only - never sent to the game server.",
+  "gui.aipatternizer.config.fetch": "Fetch Models",
+  "gui.aipatternizer.config.fetching": "Fetching model list...",
+  "gui.aipatternizer.config.fetch_ok": "Fetched %s models. Click one below to select it.",
+  "gui.aipatternizer.config.fetch_empty": "Connected, but the endpoint returned no models.",
+  "gui.aipatternizer.config.fetch_fail": "Fetch failed: %s",
+  "gui.aipatternizer.config.models_title": "Available models (click to select):",
+  "gui.aipatternizer.config.model_selected": "Selected model: %s",
 
   "message.aipatternizer.encode.ok": "[AI Patternizer] Pattern encoded.",
   "message.aipatternizer.encode.no_blank_pattern": "[AI Patternizer] Put a Blank Pattern into the left slot first.",

@@ -146,4 +146,25 @@ public class EncodeGameTest {
 
         helper.succeed();
     }
+
+    /** 网格接入：编写台与创造能源元件相邻时应成功加入 ME 网络。 */
+    @GameTest(template = "empty")
+    public static void gridConnection(GameTestHelper helper) {
+        var energyCell = ForgeRegistries.ITEMS.getValue(new ResourceLocation("ae2", "creative_energy_cell"));
+        helper.assertTrue(energyCell != null, "ae2:creative_energy_cell not found in registry");
+        var cellBlock = net.minecraft.world.level.block.Block.byItem(energyCell);
+
+        net.minecraft.core.BlockPos cellPos = new net.minecraft.core.BlockPos(1, 2, 1);
+        net.minecraft.core.BlockPos benchPos = new net.minecraft.core.BlockPos(2, 2, 1);
+        helper.setBlock(cellPos, cellBlock);
+        helper.setBlock(benchPos, dev.patternizer.registry.PRegistry.AI_PATTERNIZER.get());
+
+        helper.succeedWhen(() -> {
+            var be = helper.getBlockEntity(benchPos);
+            helper.assertTrue(be instanceof dev.patternizer.block.AiPatternizerBlockEntity,
+                    "AI Patternizer block entity missing");
+            var grid = ((dev.patternizer.block.AiPatternizerBlockEntity) be).getGrid();
+            helper.assertTrue(grid != null, "grid node not ready: no grid after joining network");
+        });
+    }
 }

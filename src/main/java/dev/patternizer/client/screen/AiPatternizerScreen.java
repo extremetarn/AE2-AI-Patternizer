@@ -195,6 +195,11 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         super.render(graphics, mouseX, mouseY, partialTick);
 
         graphics.drawString(this.font, this.title, this.leftPos + 8, this.topPos + 5, 0xFF404040, false);
+        // 右上角齿轮：打开 API 设置（Base URL / Key / 模型列表）
+        boolean gearHovered = mouseX >= this.leftPos + 158 && mouseX <= this.leftPos + 170
+                && mouseY >= this.topPos + 3 && mouseY <= this.topPos + 15;
+        graphics.drawString(this.font, "⚙", this.leftPos + 160, this.topPos + 5,
+                gearHovered ? 0xFFFFD75E : 0xFF606060, false);
 
         List<Component> lines = this.state == State.PREVIEW ? this.previewLines : this.statusLines;
         int textX = this.leftPos + 12;
@@ -211,6 +216,17 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         }
 
         this.renderTooltip(graphics, mouseX, mouseY);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.state == State.INPUT
+                && mouseX >= this.leftPos + 158 && mouseX <= this.leftPos + 170
+                && mouseY >= this.topPos + 3 && mouseY <= this.topPos + 15) {
+            Minecraft.getInstance().setScreen(new ApiSettingsScreen(this));
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
