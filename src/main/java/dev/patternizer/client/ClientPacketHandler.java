@@ -16,8 +16,7 @@ public final class ClientPacketHandler {
     private ClientPacketHandler() {
     }
 
-    public static void onEncodeResult(String result, String detail) {
-        Minecraft mc = Minecraft.getInstance();
+    public static void onEncodeResult(String result, String detail) {        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             return;
         }
@@ -58,6 +57,22 @@ public final class ClientPacketHandler {
             // note 兜底截断：即使模型啰嗦，聊天栏也只显示前 80 字（§10.22 提示词纪律）
             String text = detail.length() <= 80 ? detail : detail.substring(0, 80) + "…";
             mc.player.displayClientMessage(Component.literal(" - " + text), false);
+        }
+    }
+
+    /** S2C 整线方案回执 → 路由到编写台界面。 */
+    public static void onLinePlanResult(dev.patternizer.net.LinePlanResultPacket packet) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof dev.patternizer.client.screen.AiPatternizerScreen aps) {
+            aps.onLinePlanResult(packet);
+        }
+    }
+
+    /** S2C 落位报告 → 路由到编写台界面。 */
+    public static void onLinePlaceResult(dev.patternizer.net.LinePlaceResultPacket packet) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof dev.patternizer.client.screen.AiPatternizerScreen aps) {
+            aps.onLinePlaceResult(packet);
         }
     }
 }

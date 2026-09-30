@@ -133,7 +133,7 @@ public final class RecipeResolver {
      * - SmithingTrimRecipe 纹饰（同物品改性，不产出新物，玩家眼中的「附魔配方」）；
      * - crafting_special_* 动态配方（烟花/染色/地图复制等，无法编码为静态样板）。
      */
-    private static boolean isValidRoute(Recipe<?> recipe, Level level, Item target) {
+    public static boolean isValidRoute(Recipe<?> recipe, Level level, Item target) {
         ItemStack result = recipe.getResultItem(level.registryAccess());
         if (result.isEmpty() || result.getItem() != target) {
             return false;
@@ -162,7 +162,7 @@ public final class RecipeResolver {
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private static List<? extends Recipe<?>> allOf(net.minecraft.world.item.crafting.RecipeManager recipeManager,
+    public static List<? extends Recipe<?>> allOf(net.minecraft.world.item.crafting.RecipeManager recipeManager,
             RecipeType<?> type) {
         return (List) recipeManager.getAllRecipesFor((RecipeType) type);
     }
@@ -182,9 +182,13 @@ public final class RecipeResolver {
         return null;
     }
 
+    /** 整线批量编码入口：按默认 spec（物品替换开）编码指定配方。 */
+    public static Resolution encodeRecipeFor(Level level, Recipe<?> recipe) {
+        return encodeRecipe(level, recipe, new dev.patternizer.spec.PatternSpec());
+    }
+
     /** 按配方类别编码：原版类型走原生样板，机器类型转处理样板。 */
-    private static Resolution encodeRecipe(Level level, Recipe<?> recipe, PatternSpec spec) {
-        if (recipe instanceof CraftingRecipe crafting) {
+    private static Resolution encodeRecipe(Level level, Recipe<?> recipe, PatternSpec spec) {        if (recipe instanceof CraftingRecipe crafting) {
             return new Resolution.Encoded(encodeCrafting(level, crafting, spec), "minecraft:crafting");
         }
         if (recipe instanceof StonecutterRecipe stonecutting) {
@@ -322,7 +326,7 @@ public final class RecipeResolver {
         return ItemStack.EMPTY;
     }
 
-    private static ItemStack firstStack(Ingredient ingredient) {
+    public static ItemStack firstStack(Ingredient ingredient) {
         if (ingredient == null || ingredient.isEmpty()) {
             return ItemStack.EMPTY;
         }

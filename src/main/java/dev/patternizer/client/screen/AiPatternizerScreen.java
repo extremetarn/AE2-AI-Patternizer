@@ -18,6 +18,8 @@ import net.minecraftforge.registries.ForgeRegistries;
 import dev.patternizer.AIPatternizer;
 import dev.patternizer.client.llm.LlmGenerateService;
 import dev.patternizer.menu.AiPatternizerMenu;
+import dev.patternizer.net.LinePlanConfirmPacket;
+import dev.patternizer.net.LinePlanRequestPacket;
 import dev.patternizer.net.PatternSpecRequestPacket;
 import dev.patternizer.net.PatternizerNetwork;
 import dev.patternizer.spec.PatternSpec;
@@ -49,13 +51,14 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
     private static final int VISIBLE_LINES = (CONSOLE_Y1 - CONSOLE_Y0 - 4) / LINE_H;
 
     private enum State {
-        INPUT, CALLING, PREVIEW
+        INPUT, CALLING, PREVIEW, LINE_WAIT, LINE_PLAN, LINE_DONE
     }
 
     private State state = State.INPUT;
     private EditBox promptBox;
     private Button actionButton;
     private Button backButton;
+    private Button lineButton;
 
     private final List<Component> statusLines = new ArrayList<>();
     private final List<Component> previewLines = new ArrayList<>();
@@ -85,12 +88,17 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         this.actionButton = this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.aipatternizer.generate"),
                 btn -> onAction())
-                .bounds(this.leftPos + 8, this.topPos + 128, 80, 20)
+                .bounds(this.leftPos + 8, this.topPos + 128, 76, 20)
                 .build());
         this.backButton = this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.aipatternizer.back"),
                 btn -> setState(State.INPUT))
                 .bounds(this.leftPos + 92, this.topPos + 128, 76, 20)
+                .build());
+        this.lineButton = this.addRenderableWidget(Button.builder(
+                Component.translatable("gui.aipatternizer.line"),
+                btn -> startLinePlan())
+                .bounds(this.leftPos + 88, this.topPos + 128, 80, 20)
                 .build());
 
         setState(State.INPUT);
@@ -102,17 +110,29 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         switch (newState) {
         case INPUT -> {
             this.actionButton.setMessage(Component.translatable("gui.aipatternizer.generate"));
+            this.actionButton.visible = true;
             this.actionButton.active = true;
+            this.lineButton.visible = true;
             this.backButton.visible = false;
         }
-        case CALLING -> {
+        case CALLING, LINE_WAIT -> {
+            this.actionButton.visible = true;
             this.actionButton.active = false;
+            this.lineButton.visible = false;
             this.backButton.visible = true;
             this.backButton.setMessage(Component.translatable("gui.aipatternizer.cancel"));
         }
-        case PREVIEW -> {
+        case PREVIEW, LINE_PLAN -> {
             this.actionButton.setMessage(Component.translatable("gui.aipatternizer.confirm"));
+            this.actionButton.visible = true;
             this.actionButton.active = true;
+            this.lineButton.visible = false;
+            this.backButton.visible = true;
+            this.backButton.setMessage(Component.translatable("gui.aipatternizer.back"));
+        }
+        case LINE_DONE -> {
+            this.actionButton.visible = false;
+            this.lineButton.visible = false;
             this.backButton.visible = true;
             this.backButton.setMessage(Component.translatable("gui.aipatternizer.back"));
         }
@@ -138,9 +158,72 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         switch (this.state) {
         case INPUT -> startGenerate();
         case PREVIEW -> confirmEncode();
+        case LINE_PLAN -> PatternizerNetwork.CHANNEL.sendToServer(new LinePlanConfirmPacket());
         default -> {
         }
         }
+    }
+
+    /** 整线补齐：用检索器 Top1 候选作为目标（不走 LLM，确定性分析）。 */
+    private void startLinePlan() {
+        String prompt = this.promptBox.getValue().trim();
+        if (prompt.isEmpty()) {
+            this.statusLines.clear();
+            this.statusLines.add(Component.translatable("gui.aipatternizer.status.empty_prompt"));
+            rebuildDisplay();
+            return;
+        }
+        List<String> candidates = dev.patternizer.client.search.ItemCandidateSearch.search(prompt, 1);
+        if (candidates.isEmpty()) {
+            this.statusLines.clear();
+            this.statusLines.add(Component.translatable("gui.aipatternizer.status.no_target"));
+            rebuildDisplay();
+            return;
+        }
+        setState(State.LINE_WAIT);
+        this.statusLines.add(Component.translatable("gui.aipatternizer.status.analyzing"));
+        rebuildDisplay();
+        PatternizerNetwork.CHANNEL.sendToServer(new LinePlanRequestPacket(candidates.get(0), 1));
+    }
+
+    /** S2C 整线方案回执：展示缺口汇总，等玩家确认批量编码。 */
+    public void onLinePlanResult(dev.patternizer.net.LinePlanResultPacket packet) {
+        this.statusLines.clear();
+        if (packet.missingCount() == 0) {
+            this.statusLines.add(Component.translatable("gui.aipatternizer.line.nothing_missing",
+                    packet.totalNodes()));
+            for (String manual : packet.manualTop()) {
+                this.statusLines.add(Component.translatable("gui.aipatternizer.line.manual_item",
+                        displayNameOf(manual)));
+            }
+            setState(State.LINE_DONE);
+            return;
+        }
+        this.statusLines.add(Component.translatable("gui.aipatternizer.line.summary",
+                packet.totalNodes(), packet.missingCount(), packet.cycleCount(), packet.manualCount()));
+        for (String entry : packet.missingTop()) {
+            String id = entry.substring(0, entry.lastIndexOf(' '));
+            String count = entry.substring(entry.lastIndexOf(' ') + 1);
+            this.statusLines.add(Component.literal("  " + displayNameOf(id) + " " + count));
+        }
+        if (!packet.cycleIds().isEmpty()) {
+            this.statusLines.add(Component.translatable("gui.aipatternizer.line.cycles"));
+            for (String id : packet.cycleIds()) {
+                this.statusLines.add(Component.literal("  " + displayNameOf(id)));
+            }
+        }
+        setState(State.LINE_PLAN);
+    }
+
+    /** S2C 落位报告。 */
+    public void onLinePlaceResult(dev.patternizer.net.LinePlaceResultPacket packet) {
+        this.statusLines.clear();
+        this.statusLines.add(Component.translatable("gui.aipatternizer.line.place_summary",
+                packet.placed(), packet.todoCount()));
+        for (String line : packet.lines()) {
+            this.statusLines.add(Component.literal("  " + line));
+        }
+        setState(State.LINE_DONE);
     }
 
     private void startGenerate() {

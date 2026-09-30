@@ -25,5 +25,13 @@ public final class PatternizerNetwork {
                 PatternSpecRequestPacket::encode, PatternSpecRequestPacket::decode, PatternSpecRequestPacket::handle);
         CHANNEL.registerMessage(id++, EncodeResultPacket.class,
                 EncodeResultPacket::encode, EncodeResultPacket::decode, EncodeResultPacket::handle);
+        CHANNEL.registerMessage(id++, LinePlanRequestPacket.class,
+                LinePlanRequestPacket::encode, LinePlanRequestPacket::decode, LinePlanRequestPacket::handle);
+        CHANNEL.registerMessage(id++, LinePlanResultPacket.class,
+                LinePlanResultPacket::encode, LinePlanResultPacket::decode, LinePlanResultPacket::handle);
+        CHANNEL.registerMessage(id++, LinePlanConfirmPacket.class,
+                LinePlanConfirmPacket::encode, LinePlanConfirmPacket::decode, LinePlanConfirmPacket::handle);
+        CHANNEL.registerMessage(id++, LinePlaceResultPacket.class,
+                LinePlaceResultPacket::encode, LinePlaceResultPacket::decode, LinePlaceResultPacket::handle);
     }
 }

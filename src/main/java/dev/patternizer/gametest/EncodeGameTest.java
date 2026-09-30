@@ -314,6 +314,68 @@ public class EncodeGameTest {
         helper.assertTrue(out.length == 1, "preplaced catalyst should not appear as byproduct");
         helper.succeed();
     }
+    /** M3.6：缺口分析——空网络下铁镐应列为缺口，叶子（矿石等）列入手动。 */
+    @GameTest(template = "empty")
+    public static void gapAnalyzerBasic(GameTestHelper helper) {
+        var result = dev.patternizer.planner.GapAnalyzer.analyze(
+                helper.getLevel().getServer().getRecipeManager(), helper.getLevel(),
+                dev.patternizer.planner.NetworkSurvey.empty(), Items.IRON_PICKAXE, 1);
+        helper.assertFalse(result.missing().isEmpty(), "missing should not be empty");
+        helper.assertTrue(result.missing().stream().anyMatch(n -> n.item() == Items.IRON_PICKAXE),
+                "missing should contain iron pickaxe");
+        helper.assertTrue(result.totalNodes() >= 1, "totalNodes should be >= 1");
+        helper.succeed();
+    }
+
+    /** M3.6：缺口分析——铁锭/木棍已有样板时，缺口只剩铁镐本身。 */
+    @GameTest(template = "empty")
+    public static void gapAnalyzerWithSurvey(GameTestHelper helper) {
+        var survey = new dev.patternizer.planner.NetworkSurvey(
+                java.util.Set.of(Items.IRON_INGOT, Items.STICK), java.util.Set.of(), java.util.Map.of());
+        var result = dev.patternizer.planner.GapAnalyzer.analyze(
+                helper.getLevel().getServer().getRecipeManager(), helper.getLevel(),
+                survey, Items.IRON_PICKAXE, 1);
+        helper.assertTrue(result.missing().size() == 1 && result.missing().get(0).item() == Items.IRON_PICKAXE,
+                "missing should be exactly iron pickaxe but got " + result.missing());
+        helper.succeed();
+    }
+
+    /** M3.6：自动落位——合成样板写入网络上任意供应器的空槽。 */
+    @GameTest(template = "empty")
+    public static void autoPlacerInserts(GameTestHelper helper) {
+        var energyCell = ForgeRegistries.ITEMS.getValue(new ResourceLocation("ae2", "creative_energy_cell"));
+        var providerItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("ae2", "pattern_provider"));
+        helper.assertTrue(energyCell != null && providerItem != null, "ae2 blocks missing");
+        var cellBlock = net.minecraft.world.level.block.Block.byItem(energyCell);
+        var providerBlock = net.minecraft.world.level.block.Block.byItem(providerItem);
+
+        net.minecraft.core.BlockPos cellPos = new net.minecraft.core.BlockPos(1, 2, 1);
+        net.minecraft.core.BlockPos providerPos = new net.minecraft.core.BlockPos(2, 2, 1);
+        net.minecraft.core.BlockPos benchPos = new net.minecraft.core.BlockPos(1, 2, 2);
+        helper.setBlock(cellPos, cellBlock);
+        helper.setBlock(providerPos, providerBlock);
+        helper.setBlock(benchPos, dev.patternizer.registry.PRegistry.AI_PATTERNIZER.get());
+
+        GenericStack[] in = new GenericStack[] {
+                new GenericStack(AEItemKey.of(new ItemStack(Items.IRON_INGOT)), 1) };
+        GenericStack[] out = new GenericStack[] {
+                new GenericStack(AEItemKey.of(new ItemStack(Items.IRON_NUGGET)), 9) };
+        ItemStack pattern = PatternDetailsHelper.encodeProcessingPattern(in, out);
+
+        helper.succeedWhen(() -> {
+            var be = helper.getBlockEntity(benchPos);
+            helper.assertTrue(be instanceof dev.patternizer.block.AiPatternizerBlockEntity,
+                    "bench block entity missing");
+            var grid = ((dev.patternizer.block.AiPatternizerBlockEntity) be).getGrid();
+            helper.assertTrue(grid != null, "grid not ready");
+            var result = dev.patternizer.planner.AutoPlacer.placeAll(grid, helper.getLevel(),
+                    java.util.List.of(new dev.patternizer.planner.AutoPlacer.PlacedPattern(
+                            pattern.copy(), "minecraft:crafting")));
+            helper.assertTrue(result.placed() == 1,
+                    "expected 1 placed pattern but got " + result.placed() + " todo=" + result.todoLines());
+        });
+    }
+
     /** 网格接入：编写台与创造能源元件 + 控制器组网时应成功加入 ME 网络并上线。 */
     @GameTest(template = "empty")
     public static void gridConnection(GameTestHelper helper) {
