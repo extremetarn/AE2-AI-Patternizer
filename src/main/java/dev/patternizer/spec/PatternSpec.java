@@ -46,6 +46,7 @@ public final class PatternSpec {
     public final List<Entry> outputs = new ArrayList<>();
     public DurabilityBatch durabilityBatch;
     public String note;
-    public boolean allowSubstitutes;
+    /** 原料替换（AE2 等价物替换）：默认开启——木棍类/矿锭类配方必须允许等价替换（§10.5 反馈）。 */
+    public boolean allowSubstitutes = true;
     public boolean allowFluidSubstitutes;
 }

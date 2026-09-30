@@ -193,10 +193,26 @@ public class EncodeGameTest {
         helper.succeed();
     }
 
+    /** 回归：合成样板默认允许原料替换（木棍类配方不再钉死单一变体）。 */
+    @GameTest(template = "empty")
+    public static void craftingDefaultsToSubstitution(GameTestHelper helper) {
+        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:iron_pickaxe");
+        helper.assertTrue(spec.allowSubstitutes, "spec should default allowSubstitutes=true");
+        var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
+        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.Encoded,
+                "expected Encoded but got " + resolution);
+        ItemStack encoded = ((RecipeResolver.Resolution.Encoded) resolution).stack();
+        var details = PatternDetailsHelper.decodePattern(encoded, helper.getLevel());
+        helper.assertTrue(details != null, "decodePattern returned null");
+        helper.assertTrue(details instanceof appeng.crafting.pattern.AECraftingPattern craftingDetails
+                && craftingDetails.canSubstitute(),
+                "crafting pattern should allow substitution by default");
+        helper.succeed();
+    }
+
     /** M3：多配方冲突（苔石：圆石+藤蔓 / 圆石+苔藓块）→ 返回候选清单，选定后精确编码。 */
     @GameTest(template = "empty")
-    public static void chooseRecipeWhenMultiple(GameTestHelper helper) {
-        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:mossy_cobblestone");
+    public static void chooseRecipeWhenMultiple(GameTestHelper helper) {        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:mossy_cobblestone");
         var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
         helper.assertTrue(resolution instanceof RecipeResolver.Resolution.ChooseRecipe,
                 "expected ChooseRecipe but got " + resolution);

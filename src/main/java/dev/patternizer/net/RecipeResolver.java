@@ -167,17 +167,23 @@ public final class RecipeResolver {
                 AEItemKey.of(out), spec.allowSubstitutes);
     }
 
-    /** 用 isXxxIngredient 谓词在注册表中反查该槽位的第一个代表物品。 */
+    /** 用 isXxxIngredient 谓词在注册表中反查该槽位的第一个代表物品（原版优先）。 */
     private static ItemStack findSmithingSlot(SmithingRecipe recipe, int slot) {
-        for (Item item : ForgeRegistries.ITEMS) {
-            ItemStack stack = new ItemStack(item);
-            boolean hit = switch (slot) {
-            case 0 -> recipe.isTemplateIngredient(stack);
-            case 1 -> recipe.isBaseIngredient(stack);
-            default -> recipe.isAdditionIngredient(stack);
-            };
-            if (hit) {
-                return stack;
+        for (int pass = 0; pass < 2; pass++) {
+            for (Item item : ForgeRegistries.ITEMS) {
+                ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
+                if (pass == 0 && (id == null || !"minecraft".equals(id.getNamespace()))) {
+                    continue;
+                }
+                ItemStack stack = new ItemStack(item);
+                boolean hit = switch (slot) {
+                case 0 -> recipe.isTemplateIngredient(stack);
+                case 1 -> recipe.isBaseIngredient(stack);
+                default -> recipe.isAdditionIngredient(stack);
+                };
+                if (hit) {
+                    return stack;
+                }
             }
         }
         return ItemStack.EMPTY;
@@ -188,6 +194,17 @@ public final class RecipeResolver {
             return ItemStack.EMPTY;
         }
         ItemStack[] variants = ingredient.getItems();
-        return variants.length > 0 ? variants[0].copy() : ItemStack.EMPTY;
+        if (variants.length == 0) {
+            return ItemStack.EMPTY;
+        }
+        // 多变体配料优先取原版（minecraft 命名空间）——否则可能拿到模组排在最前的
+        // 冷僻变体（如"远古木棍"），配合 allowSubstitutes 才符合玩家直觉
+        for (ItemStack variant : variants) {
+            ResourceLocation id = ForgeRegistries.ITEMS.getKey(variant.getItem());
+            if (id != null && "minecraft".equals(id.getNamespace())) {
+                return variant.copy();
+            }
+        }
+        return variants[0].copy();
     }
 }

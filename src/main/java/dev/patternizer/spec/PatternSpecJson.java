@@ -71,7 +71,7 @@ public final class PatternSpecJson {
         spec.note = optString(root, "note", null);
         if (root.has("options") && root.get("options").isJsonObject()) {
             JsonObject o = root.getAsJsonObject("options");
-            spec.allowSubstitutes = optBool(o, "allow_substitutes", false);
+            spec.allowSubstitutes = optBool(o, "allow_substitutes", true);
             spec.allowFluidSubstitutes = optBool(o, "allow_fluid_substitutes", false);
         }
         return spec;
