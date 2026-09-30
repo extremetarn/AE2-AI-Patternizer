@@ -52,8 +52,8 @@ public final class OpenAiCompatibleClient {
         }
     }
 
-    private static final int MAX_BACKOFF_RETRIES = 3;
-    private static final long[] BACKOFF_SECONDS = { 2, 4, 8 };
+    private static final int MAX_BACKOFF_RETRIES = 2;
+    private static final long[] BACKOFF_SECONDS = { 2, 4 };
 
     private final HttpClient http;
 

@@ -55,9 +55,15 @@ public final class LlmGenerateService {
             int attempt, int maxRetries, Consumer<Result> callback) {
         client.chatComplete(messages).whenComplete((content, error) -> {
             if (error != null) {
-                String code = error.getCause() instanceof OpenAiCompatibleClient.LlmException le
-                        ? le.getMessage()
-                        : "error.llm.unknown";
+                // 解包两种形态：LlmException 本体（超时/HTTP 错误）或 CompletionException 包装
+                String code;
+                if (error instanceof OpenAiCompatibleClient.LlmException le) {
+                    code = le.getMessage();
+                } else if (error.getCause() instanceof OpenAiCompatibleClient.LlmException le) {
+                    code = le.getMessage();
+                } else {
+                    code = "error.llm.unknown";
+                }
                 LOGGER.warn("[aipatternizer] generation failed at attempt {}: {}", attempt, code);
                 callback.accept(new Result.Failed(List.of(code)));
                 return;

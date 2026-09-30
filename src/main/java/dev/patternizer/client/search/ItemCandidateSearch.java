@@ -74,6 +74,10 @@ public final class ItemCandidateSearch {
         for (String token : tokens) {
             idf.put(token, Math.log(1.0 + n / (1.0 + df.getOrDefault(token, 0))));
         }
+        LOGGER.info("[aipatternizer] search df/idf: {}", df.entrySet().stream()
+                .map(e -> e.getKey() + "(df=" + e.getValue() + ",idf="
+                        + String.format(java.util.Locale.ROOT, "%.1f", idf.get(e.getKey())) + ")")
+                .collect(java.util.stream.Collectors.joining(" ")));
 
         // 第二遍：按字段加权的相关度打分
         record Scored(String id, double score) {
@@ -130,12 +134,18 @@ public final class ItemCandidateSearch {
             }
         }
 
-        return scored.stream()
+        var ranked = scored.stream()
                 .sorted(Comparator.comparingDouble(Scored::score).reversed())
                 .limit(limit)
-                .map(Scored::id)
                 .toList();
+        LOGGER.info("[aipatternizer] search top10: {}", ranked.subList(0, Math.min(10, ranked.size()))
+                .stream()
+                .map(s -> s.id() + "=" + String.format(java.util.Locale.ROOT, "%.1f", s.score()))
+                .collect(java.util.stream.Collectors.joining(" ")));
+        return ranked.stream().map(Scored::id).toList();
     }
+
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
 
     private static final int DF_CAP = 5000;
 
