@@ -59,6 +59,7 @@
   "message.aipatternizer.encode.invalid_spec": "[AI Patternizer] Spec rejected by server validation:",
   "message.aipatternizer.encode.unsupported_type": "[AI Patternizer] This recipe type cannot be encoded:",
   "message.aipatternizer.encode.recipe_not_found": "[AI Patternizer] No crafting recipe found for:",
+  "message.aipatternizer.encode.type_changed": "[AI Patternizer] Recipe type corrected to: %s",
   "message.aipatternizer.encode.encode_failed": "[AI Patternizer] Encoding failed:",
 
   "error.llm.no_api_key": "API key is not configured. Open the mod list -> AI Patternizer -> Config.",

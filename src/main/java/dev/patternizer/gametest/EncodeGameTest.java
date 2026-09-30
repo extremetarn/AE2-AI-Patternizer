@@ -210,6 +210,17 @@ public class EncodeGameTest {
         helper.succeed();
     }
 
+    /** 回归（双子物质案）：请求 crafting 但实际是锻造配方时跨类型回退命中。 */
+    @GameTest(template = "empty")
+    public static void crossTypeFallback(GameTestHelper helper) {
+        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:netherite_sword");
+        var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
+        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.Encoded enc
+                && enc.actualType() == PatternSpec.Type.SMITHING,
+                "expected SMITHING fallback but got " + resolution);
+        helper.succeed();
+    }
+
     /** M3：多配方冲突（苔石：圆石+藤蔓 / 圆石+苔藓块）→ 返回候选清单，选定后精确编码。 */
     @GameTest(template = "empty")
     public static void chooseRecipeWhenMultiple(GameTestHelper helper) {        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:mossy_cobblestone");

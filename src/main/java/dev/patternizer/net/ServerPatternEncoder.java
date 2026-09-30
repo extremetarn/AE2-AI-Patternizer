@@ -106,6 +106,7 @@ public final class ServerPatternEncoder {
             return new String[] { failed.code(), failed.detail() };
         }
         ItemStack encoded = ((RecipeResolver.Resolution.Encoded) resolution).stack();
+        PatternSpec.Type actualType = ((RecipeResolver.Resolution.Encoded) resolution).actualType();
 
         // ③ 消耗空白样板
         if (!blankFromGrid) {
@@ -125,6 +126,10 @@ public final class ServerPatternEncoder {
             } else {
                 player.getInventory().placeItemBackInInventory(encoded);
             }
+        }
+        // 跨类型回退命中时告知玩家（双子物质案：crafting → smithing）
+        if (actualType != spec.type) {
+            return new String[] { "ok", "type_changed:" + actualType.name() };
         }
         return new String[] { "ok", spec.note };
     }

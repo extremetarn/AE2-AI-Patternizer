@@ -33,7 +33,8 @@ import dev.patternizer.spec.PatternSpec;
 public final class RecipeResolver {
 
     public sealed interface Resolution {
-        record Encoded(ItemStack stack) implements Resolution {
+        /** actualType 可能与 spec.type 不同（跨类型回退命中，见 resolveAndEncode）。 */
+        record Encoded(ItemStack stack, PatternSpec.Type actualType) implements Resolution {
         }
 
         /** 多个配方产出同一目标：候选配方 id 清单，等玩家选择。 */
@@ -48,24 +49,53 @@ public final class RecipeResolver {
     }
 
     public static Resolution resolveAndEncode(MinecraftServer server, Level level, PatternSpec spec) {
-        return switch (spec.type) {
-        case PROCESSING -> new Resolution.Encoded(PatternDetailsHelper.encodeProcessingPattern(
-                CatalystLayout.buildInputs(spec), CatalystLayout.buildOutputs(spec)));
-        case CRAFTING -> encodeByType(server, level, spec, RecipeType.CRAFTING);
-        case STONECUTTING -> encodeByType(server, level, spec, RecipeType.STONECUTTING);
-        case SMITHING -> encodeByType(server, level, spec, RecipeType.SMITHING);
+        if (spec.type == PatternSpec.Type.PROCESSING) {
+            return new Resolution.Encoded(PatternDetailsHelper.encodeProcessingPattern(
+                    CatalystLayout.buildInputs(spec), CatalystLayout.buildOutputs(spec)),
+                    PatternSpec.Type.PROCESSING);
+        }
+        Resolution primary = encodeByType(server, level, spec, spec.type);
+        // 跨类型回退（双子物质案：augment 是锻造台配方，AI 却给了 crafting）：
+        // 请求类型查无配方且未指定 recipeId 时，依次尝试其余类型
+        boolean notFound = primary instanceof Resolution.Failed f
+                && "recipe_not_found".equals(f.code());
+        if (!notFound || spec.recipeId != null) {
+            return primary;
+        }
+        for (PatternSpec.Type fallback : new PatternSpec.Type[] {
+                PatternSpec.Type.CRAFTING, PatternSpec.Type.SMITHING, PatternSpec.Type.STONECUTTING }) {
+            if (fallback == spec.type) {
+                continue;
+            }
+            Resolution r = encodeByType(server, level, spec, fallback);
+            if (r instanceof Resolution.Encoded || r instanceof Resolution.ChooseRecipe) {
+                return r;
+            }
+        }
+        return primary;
+    }
+
+    private static net.minecraft.world.item.crafting.RecipeType<?> recipeTypeOf(PatternSpec.Type type) {
+        return switch (type) {
+        case CRAFTING -> net.minecraft.world.item.crafting.RecipeType.CRAFTING;
+        case STONECUTTING -> net.minecraft.world.item.crafting.RecipeType.STONECUTTING;
+        case SMITHING -> net.minecraft.world.item.crafting.RecipeType.SMITHING;
+        default -> throw new IllegalArgumentException("no recipe type for " + type);
         };
     }
 
-    private static <C extends Container, T extends Recipe<C>> Resolution encodeByType(MinecraftServer server,
-            Level level, PatternSpec spec, RecipeType<T> type) {
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private static Resolution encodeByType(MinecraftServer server, Level level, PatternSpec spec,
+            PatternSpec.Type type) {
         Item target = ForgeRegistries.ITEMS.getValue(new ResourceLocation(spec.target));
         if (target == null) {
             return new Resolution.Failed("recipe_not_found", spec.target);
         }
 
-        List<T> matches = new ArrayList<>();
-        for (T recipe : server.getRecipeManager().getAllRecipesFor(type)) {
+        List<? extends Recipe<?>> all = (List) server.getRecipeManager()
+                .getAllRecipesFor((RecipeType) recipeTypeOf(type));
+        List<Recipe<?>> matches = new ArrayList<>();
+        for (Recipe<?> recipe : all) {
             if (recipe.getResultItem(level.registryAccess()).getItem() == target) {
                 matches.add(recipe);
             }
@@ -74,9 +104,9 @@ public final class RecipeResolver {
             return new Resolution.Failed("recipe_not_found", spec.target);
         }
 
-        T chosen = null;
+        Recipe<?> chosen = null;
         if (spec.recipeId != null && !spec.recipeId.isBlank()) {
-            for (T recipe : matches) {
+            for (Recipe<?> recipe : matches) {
                 if (recipe.getId().toString().equals(spec.recipeId)) {
                     chosen = recipe;
                     break;
@@ -95,7 +125,7 @@ public final class RecipeResolver {
         if (encoded == null) {
             return new Resolution.Failed("unsupported_type", chosen.getId().toString());
         }
-        return new Resolution.Encoded(encoded);
+        return new Resolution.Encoded(encoded, type);
     }
 
     private static ItemStack encodeOne(Level level, Recipe<?> recipe, PatternSpec spec) {

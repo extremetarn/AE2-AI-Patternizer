@@ -59,6 +59,7 @@
   "message.aipatternizer.encode.invalid_spec": "[AI 样板编写台] 规格未通过服务端校验：",
   "message.aipatternizer.encode.unsupported_type": "[AI 样板编写台] 该配方类型暂无法编码：",
   "message.aipatternizer.encode.recipe_not_found": "[AI 样板编写台] 找不到该物品的合成配方：",
+  "message.aipatternizer.encode.type_changed": "[AI 样板编写台] 配方类型已修正为：%s",
   "message.aipatternizer.encode.encode_failed": "[AI 样板编写台] 编码失败：",
 
   "error.llm.no_api_key": "未配置 API Key。请在模组列表 → AI Patternizer → 配置 中填写。",

@@ -47,6 +47,14 @@ public final class ClientPacketHandler {
                         false);
             }
         } else {
+            // 跨类型回退提示（配方类型与请求不同但被自动修正）
+            if (detail.startsWith("type_changed:")) {
+                String typeName = detail.substring("type_changed:".length());
+                mc.player.displayClientMessage(Component.translatable(
+                        "message.aipatternizer.encode.type_changed",
+                        Component.translatable("gui.aipatternizer.type." + typeName)), false);
+                return;
+            }
             // note 兜底截断：即使模型啰嗦，聊天栏也只显示前 80 字（§10.22 提示词纪律）
             String text = detail.length() <= 80 ? detail : detail.substring(0, 80) + "…";
             mc.player.displayClientMessage(Component.literal(" - " + text), false);
