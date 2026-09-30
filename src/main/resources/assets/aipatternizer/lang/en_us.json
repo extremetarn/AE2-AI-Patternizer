@@ -1,8 +1,64 @@
 {
   "block.aipatternizer.ai_patternizer": "AI Patternizer",
-  "gui.aipatternizer.prompt_hint": "Describe the pattern you need (LLM wiring arrives in M2)...",
-  "gui.aipatternizer.generate": "Generate Test Pattern",
-  "message.aipatternizer.encode.ok": "[AI Patternizer] Encoded test processing pattern: 1 iron ingot -> 9 iron nuggets.",
+
+  "gui.aipatternizer.prompt_hint": "Describe the pattern you need in natural language...",
+  "gui.aipatternizer.generate": "Generate",
+  "gui.aipatternizer.confirm": "Encode This",
+  "gui.aipatternizer.back": "Back",
+  "gui.aipatternizer.cancel": "Cancel",
+
+  "gui.aipatternizer.status.empty_prompt": "Type what you need first.",
+  "gui.aipatternizer.status.calling": "Calling the model, please wait...",
+  "gui.aipatternizer.status.failed": "Failed: %s",
+
+  "gui.aipatternizer.preview.title": "Preview (confirm to encode):",
+  "gui.aipatternizer.preview.crafting_target": "Crafting pattern for: %s",
+  "gui.aipatternizer.preview.inputs": "Inputs:",
+  "gui.aipatternizer.preview.outputs": "Outputs:",
+  "gui.aipatternizer.preview.note": "Note: %s",
+
+  "gui.aipatternizer.role.CONSUMED": "",
+  "gui.aipatternizer.role.CATALYST_RETURNED": " [catalyst, returned]",
+  "gui.aipatternizer.role.CATALYST_PREPLACED": " [pre-placed in machine]",
+  "gui.aipatternizer.role.CATALYST_DURABILITY": " [durability batch]",
+
+  "gui.aipatternizer.config.title": "AI Patternizer - API Settings",
+  "gui.aipatternizer.config.base_url": "Base URL (OpenAI-compatible)",
+  "gui.aipatternizer.config.api_key": "API Key (stored locally only)",
+  "gui.aipatternizer.config.model": "Model",
+  "gui.aipatternizer.config.key_hint": "The API key is stored in the client config file only - never sent to the game server.",
+
+  "message.aipatternizer.encode.ok": "[AI Patternizer] Pattern encoded.",
   "message.aipatternizer.encode.no_blank_pattern": "[AI Patternizer] Put a Blank Pattern into the left slot first.",
-  "message.aipatternizer.encode.no_menu": "[AI Patternizer] Internal error: menu is not open."
+  "message.aipatternizer.encode.no_menu": "[AI Patternizer] Internal error: menu is not open.",
+  "message.aipatternizer.encode.invalid_spec": "[AI Patternizer] Spec rejected by server validation:",
+  "message.aipatternizer.encode.unsupported_type": "[AI Patternizer] This pattern type is not supported yet (coming in M3):",
+  "message.aipatternizer.encode.recipe_not_found": "[AI Patternizer] No crafting recipe found for:",
+  "message.aipatternizer.encode.encode_failed": "[AI Patternizer] Encoding failed:",
+
+  "error.llm.no_api_key": "API key is not configured. Open the mod list -> AI Patternizer -> Config.",
+  "error.llm.io": "Network error",
+  "error.llm.http": "HTTP error",
+  "error.llm.bad_response": "Malformed API response",
+  "error.llm.unknown": "Unknown LLM error",
+
+  "error.spec.empty": "Model returned an empty response",
+  "error.spec.no_json": "No JSON object found in the model output",
+  "error.spec.invalid_json": "Model output is not valid JSON",
+  "error.spec.not_object": "Model output is not a JSON object",
+  "error.spec.entry_item_xor_fluid": "Each entry must have exactly one of item/fluid",
+  "error.spec.target_required": "target is required for this pattern type",
+  "error.spec.unknown_item": "Unknown item: %s",
+  "error.spec.unknown_fluid": "Unknown fluid: %s",
+  "error.spec.inputs_empty": "inputs must not be empty",
+  "error.spec.outputs_empty": "outputs must not be empty",
+  "error.spec.count_range": "count must be >= 1 for %s",
+  "error.spec.amount_range": "amount must be >= 1 for %s",
+  "error.spec.catalyst_fluid": "Catalysts cannot be fluids: %s",
+  "error.spec.durability_fluid": "Durability catalysts cannot be fluids: %s",
+  "error.spec.durability_no_damage": "Item has no durability (maxDamage=0): %s",
+  "error.spec.durability_uses_exceed": "uses_per_tool %s exceeds item durability %s",
+  "error.spec.durability_batch_required": "catalyst_durability requires durability_batch",
+  "error.spec.durability_uses_range": "uses_per_tool must be >= 1",
+  "error.spec.too_many_slots": "Too many slots: %s > %s"
 }

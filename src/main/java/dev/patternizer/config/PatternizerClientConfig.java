@@ -1,0 +1,63 @@
+package dev.patternizer.config;
+
+import net.minecraftforge.common.ForgeConfigSpec;
+
+/**
+ * 客户端配置（§4.3）：LLM API 接入参数。
+ * 仅存于客户端 config/aipatternizer-client.toml，API Key 绝不进数据包与日志。
+ */
+public final class PatternizerClientConfig {
+
+    public enum ProxyMode {
+        DIRECT, SYSTEM, CUSTOM
+    }
+
+    public static final ForgeConfigSpec SPEC;
+
+    public static final ForgeConfigSpec.ConfigValue<String> BASE_URL;
+    public static final ForgeConfigSpec.ConfigValue<String> API_KEY;
+    public static final ForgeConfigSpec.ConfigValue<String> MODEL;
+    public static final ForgeConfigSpec.IntValue TIMEOUT_SECONDS;
+    public static final ForgeConfigSpec.IntValue MAX_RETRIES;
+    public static final ForgeConfigSpec.DoubleValue TEMPERATURE;
+    public static final ForgeConfigSpec.EnumValue<ProxyMode> PROXY_MODE;
+    public static final ForgeConfigSpec.ConfigValue<String> PROXY_HOST;
+    public static final ForgeConfigSpec.IntValue PROXY_PORT;
+
+    static {
+        ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
+
+        b.push("llm");
+        BASE_URL = b.comment("OpenAI-compatible API base URL")
+                .define("baseUrl", "https://api.openai.com/v1");
+        API_KEY = b.comment("API key. Stored locally only; never sent to the game server or written to logs.")
+                .define("apiKey", "");
+        MODEL = b.comment("Model name")
+                .define("model", "gpt-4o-mini");
+        TIMEOUT_SECONDS = b.comment("Request timeout in seconds")
+                .defineInRange("timeoutSeconds", 30, 5, 300);
+        MAX_RETRIES = b.comment("Max self-correction retries when the model output fails validation")
+                .defineInRange("maxRetries", 3, 0, 8);
+        TEMPERATURE = b.comment("Sampling temperature")
+                .defineInRange("temperature", 0.2, 0.0, 1.0);
+        b.pop();
+
+        b.push("proxy");
+        PROXY_MODE = b.comment("Proxy mode: DIRECT / SYSTEM / CUSTOM")
+                .defineEnum("mode", ProxyMode.DIRECT);
+        PROXY_HOST = b.comment("Custom proxy host")
+                .define("host", "127.0.0.1");
+        PROXY_PORT = b.comment("Custom proxy port")
+                .defineInRange("port", 7890, 1, 65535);
+        b.pop();
+
+        SPEC = b.build();
+    }
+
+    private PatternizerClientConfig() {
+    }
+
+    public static void save() {
+        SPEC.save();
+    }
+}

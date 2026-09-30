@@ -1,8 +1,64 @@
 {
   "block.aipatternizer.ai_patternizer": "AI 样板编写台",
-  "gui.aipatternizer.prompt_hint": "用自然语言描述你需要的样板（M2 接入 LLM）……",
-  "gui.aipatternizer.generate": "生成测试样板",
-  "message.aipatternizer.encode.ok": "[AI 样板编写台] 已编码测试处理样板：1 铁锭 → 9 铁粒。",
+
+  "gui.aipatternizer.prompt_hint": "用自然语言描述你需要的样板……",
+  "gui.aipatternizer.generate": "生成样板",
+  "gui.aipatternizer.confirm": "确认编码",
+  "gui.aipatternizer.back": "返回",
+  "gui.aipatternizer.cancel": "取消",
+
+  "gui.aipatternizer.status.empty_prompt": "请先输入你的需求。",
+  "gui.aipatternizer.status.calling": "正在调用模型，请稍候……",
+  "gui.aipatternizer.status.failed": "失败：%s",
+
+  "gui.aipatternizer.preview.title": "预览（确认后编码）：",
+  "gui.aipatternizer.preview.crafting_target": "合成样板，目标：%s",
+  "gui.aipatternizer.preview.inputs": "输入：",
+  "gui.aipatternizer.preview.outputs": "输出：",
+  "gui.aipatternizer.preview.note": "说明：%s",
+
+  "gui.aipatternizer.role.CONSUMED": "",
+  "gui.aipatternizer.role.CATALYST_RETURNED": "（催化剂·返还）",
+  "gui.aipatternizer.role.CATALYST_PREPLACED": "（已预置于机器）",
+  "gui.aipatternizer.role.CATALYST_DURABILITY": "（耐久折批）",
+
+  "gui.aipatternizer.config.title": "AI 样板编写台 - API 设置",
+  "gui.aipatternizer.config.base_url": "Base URL（OpenAI 兼容）",
+  "gui.aipatternizer.config.api_key": "API Key（仅存本地）",
+  "gui.aipatternizer.config.model": "模型",
+  "gui.aipatternizer.config.key_hint": "API Key 只保存在客户端配置文件中，绝不会发送给游戏服务器。",
+
+  "message.aipatternizer.encode.ok": "[AI 样板编写台] 样板编码完成。",
   "message.aipatternizer.encode.no_blank_pattern": "[AI 样板编写台] 请先在左侧槽位放入空白样板。",
-  "message.aipatternizer.encode.no_menu": "[AI 样板编写台] 内部错误：容器未打开。"
+  "message.aipatternizer.encode.no_menu": "[AI 样板编写台] 内部错误：容器未打开。",
+  "message.aipatternizer.encode.invalid_spec": "[AI 样板编写台] 规格未通过服务端校验：",
+  "message.aipatternizer.encode.unsupported_type": "[AI 样板编写台] 该样板类型暂不支持（M3 提供）：",
+  "message.aipatternizer.encode.recipe_not_found": "[AI 样板编写台] 找不到该物品的合成配方：",
+  "message.aipatternizer.encode.encode_failed": "[AI 样板编写台] 编码失败：",
+
+  "error.llm.no_api_key": "未配置 API Key。请在模组列表 → AI Patternizer → 配置 中填写。",
+  "error.llm.io": "网络错误",
+  "error.llm.http": "HTTP 错误",
+  "error.llm.bad_response": "API 返回格式异常",
+  "error.llm.unknown": "未知 LLM 错误",
+
+  "error.spec.empty": "模型返回了空内容",
+  "error.spec.no_json": "模型输出中找不到 JSON 对象",
+  "error.spec.invalid_json": "模型输出不是合法 JSON",
+  "error.spec.not_object": "模型输出不是 JSON 对象",
+  "error.spec.entry_item_xor_fluid": "每个条目必须且只能有 item 或 fluid 之一",
+  "error.spec.target_required": "该样板类型必须提供 target",
+  "error.spec.unknown_item": "不存在的物品：%s",
+  "error.spec.unknown_fluid": "不存在的流体：%s",
+  "error.spec.inputs_empty": "inputs 不能为空",
+  "error.spec.outputs_empty": "outputs 不能为空",
+  "error.spec.count_range": "%s 的 count 必须 ≥ 1",
+  "error.spec.amount_range": "%s 的 amount 必须 ≥ 1",
+  "error.spec.catalyst_fluid": "催化剂不能是流体：%s",
+  "error.spec.durability_fluid": "耐久催化剂不能是流体：%s",
+  "error.spec.durability_no_damage": "该物品没有耐久（maxDamage=0）：%s",
+  "error.spec.durability_uses_exceed": "uses_per_tool %s 超过物品耐久 %s",
+  "error.spec.durability_batch_required": "catalyst_durability 必须提供 durability_batch",
+  "error.spec.durability_uses_range": "uses_per_tool 必须 ≥ 1",
+  "error.spec.too_many_slots": "槽位超限：%s > %s"
 }

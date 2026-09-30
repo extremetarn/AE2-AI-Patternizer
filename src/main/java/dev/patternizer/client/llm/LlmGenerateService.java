@@ -1,0 +1,83 @@
+package dev.patternizer.client.llm;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+
+import dev.patternizer.client.llm.OpenAiCompatibleClient.Message;
+import dev.patternizer.client.search.ItemCandidateSearch;
+import dev.patternizer.config.PatternizerClientConfig;
+import dev.patternizer.spec.PatternSpec;
+import dev.patternizer.spec.PatternSpecJson;
+import dev.patternizer.spec.PatternSpecValidator;
+import dev.patternizer.spec.PatternSpecValidator.ValidationError;
+
+/**
+ * LLM 生成编排（客户端）：检索候选 → 组 prompt → 调 LLM →
+ * 解析 + 校验 → 失败则回喂错误自动重试（自我修正循环，§5.5）。
+ * 结果回调统一切回客户端主线程由调用方处理。
+ */
+public final class LlmGenerateService {
+
+    public sealed interface Result {
+        record Ok(PatternSpec spec, String rawJson) implements Result {
+        }
+
+        record Failed(List<String> errorLines) implements Result {
+        }
+    }
+
+    private LlmGenerateService() {
+    }
+
+    /**
+     * @param prompt 玩家自然语言需求（必须在客户端线程调用，检索器要读译名）
+     */
+    public static void generate(String prompt, Consumer<Result> callback) {
+        List<String> items = ItemCandidateSearch.search(prompt);
+        List<String> fluids = ItemCandidateSearch.searchFluids(prompt, 20);
+
+        List<Message> messages = PromptBuilder.initialMessages(prompt, items, fluids);
+        OpenAiCompatibleClient client = new OpenAiCompatibleClient();
+        int maxRetries = PatternizerClientConfig.MAX_RETRIES.get();
+
+        attempt(client, messages, 0, maxRetries, callback);
+    }
+
+    private static void attempt(OpenAiCompatibleClient client, List<Message> messages,
+            int attempt, int maxRetries, Consumer<Result> callback) {
+        client.chatComplete(messages).whenComplete((content, error) -> {
+            if (error != null) {
+                String code = error.getCause() instanceof OpenAiCompatibleClient.LlmException le
+                        ? le.getMessage()
+                        : "error.llm.unknown";
+                callback.accept(new Result.Failed(List.of(code)));
+                return;
+            }
+            List<String> errorLines = new ArrayList<>();
+            PatternSpec spec = null;
+            try {
+                spec = PatternSpecJson.parse(content);
+                for (ValidationError ve : PatternSpecValidator.validate(spec)) {
+                    errorLines.add(ve.key() + " " + String.join(" ", ve.args()));
+                }
+            } catch (PatternSpecJson.SpecParseException e) {
+                errorLines.add(e.getMessage());
+            }
+
+            if (spec != null && errorLines.isEmpty()) {
+                callback.accept(new Result.Ok(spec, content));
+                return;
+            }
+            if (attempt >= maxRetries) {
+                callback.accept(new Result.Failed(errorLines));
+                return;
+            }
+            // 自我修正：把错误回喂给模型
+            messages.add(new Message("assistant", content));
+            messages.add(new Message("user", PromptBuilder.correctionPrompt(errorLines)));
+            attempt(client, messages, attempt + 1, maxRetries, callback);
+        });
+    }
+}
