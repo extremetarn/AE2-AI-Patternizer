@@ -21,7 +21,9 @@ public final class ItemCandidateSearch {
 
     private static final int DEFAULT_LIMIT = 80;
     private static final Pattern CJK_RUN = Pattern.compile("[\\u4e00-\\u9fff]{2,}");
-    private static final Pattern LATIN_WORD = Pattern.compile("[a-zA-Z][a-z0-9_]{2,}");
+    // 修正（2026-10-01）：后续字符类必须包含大写——原写法 [a-z0-9_] 使
+    // "ATM" 这类全大写缩写永远无法被提取（ATM 案根因）
+    private static final Pattern LATIN_WORD = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]{2,}");
     private static final Pattern REGISTRY_REF = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_/.-]+");
 
     private ItemCandidateSearch() {
@@ -80,7 +82,7 @@ public final class ItemCandidateSearch {
                 .collect(java.util.stream.Collectors.joining(" ")));
 
         // 定案探针：df=0 的拉丁 token（任何名称源都没命中）时，采样同首字母命名空间的
-        // 物品实际显示名——用于判断是语言问题还是匹配逻辑问题（2026-10-01 ATM 案）
+        // 物品实际显示名与逐样本 contains 评估——用于判断是语言问题还是匹配逻辑问题
         for (String token : latinTokens) {
             if (df.getOrDefault(token, 0) == 0 && !token.isEmpty()) {
                 char first = Character.toLowerCase(token.charAt(0));
@@ -91,8 +93,9 @@ public final class ItemCandidateSearch {
                             || id.getNamespace().charAt(0) != first) {
                         continue;
                     }
-                    samples.add(id + "->"
-                            + item.getDefaultInstance().getHoverName().getString());
+                    String name = item.getDefaultInstance().getHoverName().getString();
+                    samples.add(id + "->" + name + "(contains="
+                            + name.toLowerCase(java.util.Locale.ROOT).contains(token) + ")");
                     if (samples.size() >= 5) {
                         break;
                     }
@@ -195,7 +198,7 @@ public final class ItemCandidateSearch {
     }
 
     /** 提取关键词：CJK 连续段整段 + 二元组，拉丁词整词。 */
-    static Set<String> extractTokens(String prompt) {
+    public static Set<String> extractTokens(String prompt) {
         Set<String> tokens = new HashSet<>();
         Matcher cjk = CJK_RUN.matcher(prompt);
         while (cjk.find()) {

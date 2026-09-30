@@ -233,10 +233,17 @@ public class EncodeGameTest {
         return spec;
     }
 
+    /** 回归（2026-10-01 ATM 案）：全大写拉丁缩写必须能被提取为 token。 */
+    @GameTest(template = "empty")
+    public static void latinAcronymTokenExtraction(GameTestHelper helper) {
+        var tokens = dev.patternizer.client.search.ItemCandidateSearch.extractTokens("ATM镐的合成样板");
+        helper.assertTrue(tokens.contains("atm"), "tokens should contain 'atm' but got: " + tokens);
+        helper.succeed();
+    }
+
     /** M3.5：不可收回黑名单——命中即强制预置式，布局中不再出现该物品。 */
     @GameTest(template = "empty")
-    public static void catalystPolicyBlacklist(GameTestHelper helper) {
-        PatternSpec spec = new PatternSpec();
+    public static void catalystPolicyBlacklist(GameTestHelper helper) {        PatternSpec spec = new PatternSpec();
         spec.type = PatternSpec.Type.PROCESSING;
         spec.inputs.add(itemEntry("minecraft:iron_ingot", 4, PatternSpec.Role.CONSUMED));
         spec.inputs.add(itemEntry("mysticalagriculture:infusion_crystal", 1, PatternSpec.Role.CATALYST_RETURNED));
