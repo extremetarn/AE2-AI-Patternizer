@@ -85,5 +85,6 @@
   "error.spec.durability_uses_exceed": "uses_per_tool %s exceeds item durability %s",
   "error.spec.durability_batch_required": "catalyst_durability requires durability_batch",
   "error.spec.durability_uses_range": "uses_per_tool must be >= 1",
-  "error.spec.too_many_slots": "Too many slots: %s > %s"
+  "error.spec.too_many_slots": "Too many slots: %s > %s",
+  "error.spec.not_in_candidates": "%s is not in the candidate list - pick from the candidate list"
 }

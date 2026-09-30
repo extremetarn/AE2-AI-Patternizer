@@ -85,5 +85,6 @@
   "error.spec.durability_uses_exceed": "uses_per_tool %s 超过物品耐久 %s",
   "error.spec.durability_batch_required": "catalyst_durability 必须提供 durability_batch",
   "error.spec.durability_uses_range": "uses_per_tool 必须 ≥ 1",
-  "error.spec.too_many_slots": "槽位超限：%s > %s"
+  "error.spec.too_many_slots": "槽位超限：%s > %s",
+  "error.spec.not_in_candidates": "%s 不在候选清单中，请从候选清单中选择"
 }

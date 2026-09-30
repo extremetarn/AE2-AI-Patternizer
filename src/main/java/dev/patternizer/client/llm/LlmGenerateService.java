@@ -40,6 +40,8 @@ public final class LlmGenerateService {
         List<String> items = ItemCandidateSearch.search(prompt);
         List<String> fluids = ItemCandidateSearch.searchFluids(prompt, 20);
         var durabilityInfo = ItemCandidateSearch.durabilityInfo(items);
+        java.util.Set<String> itemSet = new java.util.HashSet<>(items);
+        java.util.Set<String> fluidSet = new java.util.HashSet<>(fluids);
         LOGGER.info("[aipatternizer] generate for prompt='{}' | item candidates={} fluids={} top10={}",
                 prompt, items.size(), fluids.size(),
                 items.subList(0, Math.min(10, items.size())));
@@ -48,11 +50,36 @@ public final class LlmGenerateService {
         OpenAiCompatibleClient client = new OpenAiCompatibleClient();
         int maxRetries = PatternizerClientConfig.MAX_RETRIES.get();
 
-        attempt(client, messages, 0, maxRetries, callback);
+        attempt(client, messages, 0, maxRetries, itemSet, fluidSet, callback);
+    }
+
+    /** 硬校验：target 与所有物品/流体条目必须来自候选清单（双子物质案的防线）。 */
+    private static List<String> checkCandidates(PatternSpec spec, java.util.Set<String> items,
+            java.util.Set<String> fluids) {
+        List<String> errors = new ArrayList<>();
+        if (spec.target != null && !items.contains(spec.target)) {
+            errors.add("error.spec.not_in_candidates|" + spec.target);
+        }
+        for (var e : spec.inputs) {
+            if (e.isFluid() && !fluids.contains(e.fluid)) {
+                errors.add("error.spec.not_in_candidates|" + e.fluid);
+            } else if (!e.isFluid() && e.item != null && !items.contains(e.item)) {
+                errors.add("error.spec.not_in_candidates|" + e.item);
+            }
+        }
+        for (var e : spec.outputs) {
+            if (e.isFluid() && !fluids.contains(e.fluid)) {
+                errors.add("error.spec.not_in_candidates|" + e.fluid);
+            } else if (!e.isFluid() && e.item != null && !items.contains(e.item)) {
+                errors.add("error.spec.not_in_candidates|" + e.item);
+            }
+        }
+        return errors;
     }
 
     private static void attempt(OpenAiCompatibleClient client, List<Message> messages,
-            int attempt, int maxRetries, Consumer<Result> callback) {
+            int attempt, int maxRetries, java.util.Set<String> itemSet, java.util.Set<String> fluidSet,
+            Consumer<Result> callback) {
         client.chatComplete(messages).whenComplete((content, error) -> {
             if (error != null) {
                 // 解包两种形态：LlmException 本体（超时/HTTP 错误）或 CompletionException 包装
@@ -74,6 +101,10 @@ public final class LlmGenerateService {
                 spec = PatternSpecJson.parse(content);
                 for (ValidationError ve : PatternSpecValidator.validate(spec)) {
                     errorLines.add(ve.key() + " " + String.join(" ", ve.args()));
+                }
+                // 候选清单硬校验（防训练知识漂移：双子物质案 AI 凭印象选了清单外的 mekanism 机器）
+                if (spec != null) {
+                    errorLines.addAll(checkCandidates(spec, itemSet, fluidSet));
                 }
             } catch (PatternSpecJson.SpecParseException e) {
                 errorLines.add(e.getMessage());
@@ -100,7 +131,7 @@ public final class LlmGenerateService {
             // 自我修正：把错误回喂给模型
             messages.add(new Message("assistant", content));
             messages.add(new Message("user", PromptBuilder.correctionPrompt(errorLines)));
-            attempt(client, messages, attempt + 1, maxRetries, callback);
+            attempt(client, messages, attempt + 1, maxRetries, itemSet, fluidSet, callback);
         });
     }
 }
