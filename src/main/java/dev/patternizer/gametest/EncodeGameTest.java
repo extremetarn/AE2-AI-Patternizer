@@ -15,6 +15,7 @@ import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import dev.patternizer.AIPatternizer;
+import dev.patternizer.net.RecipeResolver;
 import dev.patternizer.spec.CatalystLayout;
 import dev.patternizer.spec.PatternSpec;
 import dev.patternizer.spec.PatternSpecValidator;
@@ -145,6 +146,75 @@ public class EncodeGameTest {
                 && decodedPrimary.getItem() == Items.IRON_NUGGET, "decoded primary output mismatch");
 
         helper.succeed();
+    }
+
+    /** M3：RecipeResolver——合成样板经配方反查编码。 */
+    @GameTest(template = "empty")
+    public static void craftingViaResolver(GameTestHelper helper) {
+        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:oak_planks");
+        var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
+        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.Encoded,
+                "expected Encoded but got " + resolution);
+        ItemStack encoded = ((RecipeResolver.Resolution.Encoded) resolution).stack();
+        var details = PatternDetailsHelper.decodePattern(encoded, helper.getLevel());
+        helper.assertTrue(details != null, "decodePattern returned null");
+        helper.assertTrue(details.getPrimaryOutput().what() instanceof AEItemKey key
+                && key.getItem() == Items.OAK_PLANKS, "primary output should be oak planks");
+        helper.succeed();
+    }
+
+    /** M3：切石样板（石头 → 石砖）。 */
+    @GameTest(template = "empty")
+    public static void stonecuttingViaResolver(GameTestHelper helper) {
+        PatternSpec spec = targetSpec(PatternSpec.Type.STONECUTTING, "minecraft:stone_bricks");
+        var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
+        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.Encoded,
+                "expected Encoded but got " + resolution);
+        ItemStack encoded = ((RecipeResolver.Resolution.Encoded) resolution).stack();
+        var details = PatternDetailsHelper.decodePattern(encoded, helper.getLevel());
+        helper.assertTrue(details != null, "decodePattern returned null");
+        helper.assertTrue(details.getPrimaryOutput().what() instanceof AEItemKey key
+                && key.getItem() == Items.STONE_BRICKS, "primary output should be stone bricks");
+        helper.succeed();
+    }
+
+    /** M3：锻造样板（下界合金剑升级；同时验证 AccessTransformer 字段放开生效）。 */
+    @GameTest(template = "empty")
+    public static void smithingViaResolver(GameTestHelper helper) {
+        PatternSpec spec = targetSpec(PatternSpec.Type.SMITHING, "minecraft:netherite_sword");
+        var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
+        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.Encoded,
+                "expected Encoded but got " + resolution);
+        ItemStack encoded = ((RecipeResolver.Resolution.Encoded) resolution).stack();
+        var details = PatternDetailsHelper.decodePattern(encoded, helper.getLevel());
+        helper.assertTrue(details != null, "decodePattern returned null");
+        helper.assertTrue(details.getPrimaryOutput().what() instanceof AEItemKey key
+                && key.getItem() == Items.NETHERITE_SWORD, "primary output should be netherite sword");
+        helper.succeed();
+    }
+
+    /** M3：多配方冲突（苔石：圆石+藤蔓 / 圆石+苔藓块）→ 返回候选清单，选定后精确编码。 */
+    @GameTest(template = "empty")
+    public static void chooseRecipeWhenMultiple(GameTestHelper helper) {
+        PatternSpec spec = targetSpec(PatternSpec.Type.CRAFTING, "minecraft:mossy_cobblestone");
+        var resolution = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
+        helper.assertTrue(resolution instanceof RecipeResolver.Resolution.ChooseRecipe,
+                "expected ChooseRecipe but got " + resolution);
+        var ids = ((RecipeResolver.Resolution.ChooseRecipe) resolution).recipeIds();
+        helper.assertTrue(ids.size() >= 2, "expected >=2 candidate recipes but got " + ids);
+
+        spec.recipeId = ids.get(0);
+        var second = RecipeResolver.resolveAndEncode(helper.getLevel().getServer(), helper.getLevel(), spec);
+        helper.assertTrue(second instanceof RecipeResolver.Resolution.Encoded,
+                "expected Encoded after choosing a recipe but got " + second);
+        helper.succeed();
+    }
+
+    private static PatternSpec targetSpec(PatternSpec.Type type, String target) {
+        PatternSpec spec = new PatternSpec();
+        spec.type = type;
+        spec.target = target;
+        return spec;
     }
 
     /** 网格接入：编写台与创造能源元件 + 控制器组网时应成功加入 ME 网络并上线。 */

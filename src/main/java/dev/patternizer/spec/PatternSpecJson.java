@@ -44,6 +44,7 @@ public final class PatternSpecJson {
         spec.type = parseEnum(PatternSpec.Type.class, optString(root, "type", "processing"),
                 PatternSpec.Type.PROCESSING);
         spec.target = optString(root, "target", null);
+        spec.recipeId = optString(root, "recipe_id", null);
 
         if (root.has("inputs") && root.get("inputs").isJsonArray()) {
             for (JsonElement e : root.getAsJsonArray("inputs")) {
@@ -113,6 +114,9 @@ public final class PatternSpecJson {
         root.addProperty("type", spec.type.name().toLowerCase(Locale.ROOT));
         if (spec.target != null) {
             root.addProperty("target", spec.target);
+        }
+        if (spec.recipeId != null) {
+            root.addProperty("recipe_id", spec.recipeId);
         }
         JsonArray in = new JsonArray();
         for (PatternSpec.Entry e : spec.inputs) {

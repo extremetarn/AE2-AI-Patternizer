@@ -21,6 +21,12 @@ public final class ClientPacketHandler {
         if (mc.player == null) {
             return;
         }
+        // 多配方冲突：当前打开着编写台界面时，弹出配方选择界面
+        if ("choose_recipe".equals(result) && detail != null
+                && mc.screen instanceof dev.patternizer.client.screen.AiPatternizerScreen aps) {
+            aps.openRecipeChoice(List.of(detail.split("\n")));
+            return;
+        }
         mc.player.displayClientMessage(Component.translatable("message.aipatternizer.encode." + result), false);
         if (detail == null || detail.isEmpty()) {
             return;

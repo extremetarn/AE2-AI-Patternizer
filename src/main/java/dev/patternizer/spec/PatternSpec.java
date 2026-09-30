@@ -41,6 +41,7 @@ public final class PatternSpec {
 
     public Type type = Type.PROCESSING;
     public String target; // crafting/stonecutting/smithing 的目标产物 "modid:name"
+    public String recipeId; // 多配方冲突时玩家选定的配方 id（RecipeResolver 回传后重发时携带）
     public final List<Entry> inputs = new ArrayList<>();
     public final List<Entry> outputs = new ArrayList<>();
     public DurabilityBatch durabilityBatch;

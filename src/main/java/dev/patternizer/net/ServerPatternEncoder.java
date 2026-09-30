@@ -7,20 +7,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.CraftingRecipe;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraftforge.items.ItemStackHandler;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEItemKey;
-import appeng.api.stacks.GenericStack;
 import dev.patternizer.block.AiPatternizerBlockEntity;
 import dev.patternizer.menu.AiPatternizerMenu;
-import dev.patternizer.spec.CatalystLayout;
 import dev.patternizer.spec.PatternSpec;
 import dev.patternizer.spec.PatternSpecJson;
 import dev.patternizer.spec.PatternSpecValidator;
@@ -84,25 +78,24 @@ public final class ServerPatternEncoder {
             return new String[] { "no_blank_pattern", null };
         }
 
-        // ② 编码
-        ItemStack encoded;
+        // ② 编码（配方反查与多配方冲突见 RecipeResolver）
+        RecipeResolver.Resolution resolution;
         try {
-            encoded = switch (spec.type) {
-            case PROCESSING -> encodeProcessing(spec);
-            case CRAFTING -> encodeCrafting(player, spec);
-            default -> null; // STONECUTTING / SMITHING 见 M3
-            };
+            resolution = RecipeResolver.resolveAndEncode(player.server, player.level(), spec);
         } catch (Exception e) {
             refundBlankPattern(grid, player, storage, blankPattern, blankFromGrid, source);
             return new String[] { "encode_failed", e.getClass().getSimpleName() };
         }
-        if (encoded == null) {
+        if (resolution instanceof RecipeResolver.Resolution.ChooseRecipe choose) {
+            // 多配方冲突：不猜，把候选配方 id 回给客户端选择（§10.5），空白样板已退/未扣
             refundBlankPattern(grid, player, storage, blankPattern, blankFromGrid, source);
-            return new String[] {
-                    spec.type == PatternSpec.Type.CRAFTING ? "recipe_not_found" : "unsupported_type",
-                    spec.target
-            };
+            return new String[] { "choose_recipe", String.join("\n", choose.recipeIds()) };
         }
+        if (resolution instanceof RecipeResolver.Resolution.Failed failed) {
+            refundBlankPattern(grid, player, storage, blankPattern, blankFromGrid, source);
+            return new String[] { failed.code(), failed.detail() };
+        }
+        ItemStack encoded = ((RecipeResolver.Resolution.Encoded) resolution).stack();
 
         // ③ 消耗空白样板
         if (!blankFromGrid) {
@@ -136,48 +129,5 @@ public final class ServerPatternEncoder {
             return;
         }
         player.getInventory().placeItemBackInInventory(new ItemStack(blankPattern));
-    }
-
-    private static ItemStack encodeProcessing(PatternSpec spec) {
-        GenericStack[] inputs = CatalystLayout.buildInputs(spec);
-        GenericStack[] outputs = CatalystLayout.buildOutputs(spec);
-        return PatternDetailsHelper.encodeProcessingPattern(inputs, outputs);
-    }
-
-    /** M2 简化版：取第一个产物匹配的原版合成配方（多配方冲突消歧见 M3 / §10.5）。 */
-    private static ItemStack encodeCrafting(ServerPlayer player, PatternSpec spec) {
-        var level = player.level();
-        Item targetItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation(spec.target));
-        if (targetItem == null) {
-            return null;
-        }
-        CraftingRecipe match = null;
-        for (CraftingRecipe recipe : player.server.getRecipeManager().getAllRecipesFor(RecipeType.CRAFTING)) {
-            if (recipe.getResultItem(level.registryAccess()).getItem() == targetItem) {
-                match = recipe;
-                break;
-            }
-        }
-        if (match == null) {
-            return null;
-        }
-        ItemStack[] grid = new ItemStack[9];
-        for (int i = 0; i < grid.length; i++) {
-            grid[i] = ItemStack.EMPTY;
-        }
-        int i = 0;
-        for (Ingredient ingredient : match.getIngredients()) {
-            if (i >= grid.length) {
-                break;
-            }
-            ItemStack[] variants = ingredient.getItems();
-            if (variants.length > 0) {
-                grid[i] = variants[0].copy();
-            }
-            i++;
-        }
-        ItemStack out = match.getResultItem(level.registryAccess()).copy();
-        return PatternDetailsHelper.encodeCraftingPattern(match, grid, out,
-                spec.allowSubstitutes, spec.allowFluidSubstitutes);
     }
 }

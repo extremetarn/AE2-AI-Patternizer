@@ -145,6 +145,14 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         setState(State.INPUT);
     }
 
+    /** 服务端回传多配方冲突：弹出选择界面（M3 / §10.5 不猜原则）。 */
+    public void openRecipeChoice(java.util.List<String> recipeIds) {
+        if (this.confirmedSpec == null) {
+            return;
+        }
+        Minecraft.getInstance().setScreen(new RecipeChoiceScreen(this, this.confirmedSpec, recipeIds));
+    }
+
     private void buildPreview(PatternSpec spec) {
         this.previewLines.clear();
         if (spec.type != PatternSpec.Type.PROCESSING) {

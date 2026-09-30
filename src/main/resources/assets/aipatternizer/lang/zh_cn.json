@@ -35,6 +35,8 @@
   "gui.aipatternizer.config.fetch_fail": "拉取失败：%s",
   "gui.aipatternizer.config.models_title": "可用模型（点击选择）：",
   "gui.aipatternizer.config.model_selected": "已选择模型：%s",
+  "gui.aipatternizer.choice.title": "发现多个配方",
+  "gui.aipatternizer.choice.hint": "有多个配方都能产出 %s，点击选择一个进行编码：",
 
   "message.aipatternizer.encode.ok": "[AI 样板编写台] 样板编码完成。",
   "message.aipatternizer.encode.no_blank_pattern": "[AI 样板编写台] 请先在左侧槽位放入空白样板。",
