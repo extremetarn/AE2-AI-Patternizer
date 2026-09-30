@@ -20,6 +20,8 @@ import dev.patternizer.spec.PatternSpecValidator.ValidationError;
  */
 public final class LlmGenerateService {
 
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+
     public sealed interface Result {
         record Ok(PatternSpec spec, String rawJson, List<String> policyHits) implements Result {
         }
@@ -38,6 +40,9 @@ public final class LlmGenerateService {
         List<String> items = ItemCandidateSearch.search(prompt);
         List<String> fluids = ItemCandidateSearch.searchFluids(prompt, 20);
         var durabilityInfo = ItemCandidateSearch.durabilityInfo(items);
+        LOGGER.info("[aipatternizer] generate for prompt='{}' | item candidates={} fluids={} top10={}",
+                prompt, items.size(), fluids.size(),
+                items.subList(0, Math.min(10, items.size())));
 
         List<Message> messages = PromptBuilder.initialMessages(prompt, items, fluids, durabilityInfo);
         OpenAiCompatibleClient client = new OpenAiCompatibleClient();
@@ -53,6 +58,7 @@ public final class LlmGenerateService {
                 String code = error.getCause() instanceof OpenAiCompatibleClient.LlmException le
                         ? le.getMessage()
                         : "error.llm.unknown";
+                LOGGER.warn("[aipatternizer] generation failed at attempt {}: {}", attempt, code);
                 callback.accept(new Result.Failed(List.of(code)));
                 return;
             }
@@ -75,9 +81,14 @@ public final class LlmGenerateService {
                 return;
             }
             if (attempt >= maxRetries) {
+                LOGGER.warn("[aipatternizer] validation failed after {} attempt(s): {} | last model output: {}",
+                        attempt + 1, errorLines,
+                        content == null ? "<null>"
+                                : content.substring(0, Math.min(800, content.length())));
                 callback.accept(new Result.Failed(errorLines));
                 return;
             }
+            LOGGER.info("[aipatternizer] attempt {} validation errors, self-correcting: {}", attempt + 1, errorLines);
             // 自我修正：把错误回喂给模型
             messages.add(new Message("assistant", content));
             messages.add(new Message("user", PromptBuilder.correctionPrompt(errorLines)));

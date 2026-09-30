@@ -26,6 +26,15 @@ import dev.patternizer.config.PatternizerClientConfig;
  */
 public final class OpenAiCompatibleClient {
 
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+
+    private static String abbreviate(String body) {
+        if (body == null) {
+            return "<null>";
+        }
+        return body.length() <= 300 ? body : body.substring(0, 300) + "...";
+    }
+
     /** 一条对话消息。 */
     public record Message(String role, String content) {
     }
@@ -159,6 +168,7 @@ public final class OpenAiCompatibleClient {
         http.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .whenComplete((response, error) -> {
                     if (error != null) {
+                        LOGGER.warn("[aipatternizer] LLM request IO error: {}", error.toString());
                         retryOrFail(messages, backoffAttempt, future,
                                 new LlmException("error.llm.io|" + error.getClass().getSimpleName(), true));
                         return;
@@ -173,10 +183,13 @@ public final class OpenAiCompatibleClient {
                                     .get("content").getAsString();
                             future.complete(content);
                         } catch (Exception e) {
+                            LOGGER.warn("[aipatternizer] LLM response parse error, body head: {}",
+                                    abbreviate(response.body()));
                             future.completeExceptionally(
                                     new LlmException("error.llm.bad_response|" + e.getClass().getSimpleName(), false));
                         }
                     } else {
+                        LOGGER.warn("[aipatternizer] LLM HTTP {}: {}", status, abbreviate(response.body()));
                         boolean retryable = status == 429 || status >= 500;
                         retryOrFail(messages, backoffAttempt, future,
                                 new LlmException("error.llm.http|" + status, retryable));
