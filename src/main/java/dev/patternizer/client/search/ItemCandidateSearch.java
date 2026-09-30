@@ -56,19 +56,21 @@ public final class ItemCandidateSearch {
             }
 
             String displayName = item.getDefaultInstance().getHoverName().getString();
+            String displayLower = displayName.toLowerCase(Locale.ROOT);
             String path = id.getPath();
             String namespace = id.getNamespace();
             for (String token : tokens) {
                 if (token.length() < 2) {
                     continue;
                 }
-                if (displayName.contains(token)) {
+                // 大小写不敏感："ATM" 必须能匹配显示名 "ATM镐"（2026-09-30 实测案例）
+                if (displayLower.contains(token)) {
                     score += token.length() * 4;
                 }
-                if (path.contains(token.toLowerCase(Locale.ROOT))) {
+                if (path.contains(token)) {
                     score += token.length() * 2;
                 }
-                if (namespace.contains(token.toLowerCase(Locale.ROOT))) {
+                if (namespace.contains(token)) {
                     score += 2;
                 }
             }

@@ -77,6 +77,8 @@ public final class LlmGenerateService {
                 // 催化剂策略（§10.15）：不可收回黑名单强制预置式
                 List<String> policyHits = dev.patternizer.spec.CatalystPolicy.apply(
                         spec, dev.patternizer.config.PatternizerClientConfig.unreturnableSet());
+                LOGGER.info("[aipatternizer] generation ok: type={} target={} inputs={} outputs={}",
+                        spec.type, spec.target, spec.inputs.size(), spec.outputs.size());
                 callback.accept(new Result.Ok(spec, content, policyHits));
                 return;
             }

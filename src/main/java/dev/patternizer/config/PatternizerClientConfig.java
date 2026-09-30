@@ -38,7 +38,7 @@ public final class PatternizerClientConfig {
         MODEL = b.comment("Model name")
                 .define("model", "gpt-4o-mini");
         TIMEOUT_SECONDS = b.comment("Request timeout in seconds")
-                .defineInRange("timeoutSeconds", 30, 5, 300);
+                .defineInRange("timeoutSeconds", 60, 5, 300);
         MAX_RETRIES = b.comment("Max self-correction retries when the model output fails validation")
                 .defineInRange("maxRetries", 3, 0, 8);
         TEMPERATURE = b.comment("Sampling temperature")
