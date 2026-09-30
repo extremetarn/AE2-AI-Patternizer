@@ -26,6 +26,12 @@
   "gui.aipatternizer.setup.returned": "- %s: must be pulled back into the network; blocking mode / lock crafting recommended",
   "gui.aipatternizer.setup.preplaced": "- %s: pre-place it in the machine; make sure it cannot be extracted",
   "gui.aipatternizer.setup.durability": "- %s: consumed per %s uses; consider a crafting pattern for it to close the loop",
+  "gui.aipatternizer.no_recipe": "No %s recipe exists for: %s",
+  "gui.aipatternizer.no_recipe_hint": "It is probably obtained via a ritual/machine/drop - ask for a PROCESSING pattern instead (describe the process).",
+  "gui.aipatternizer.type.CRAFTING": "crafting",
+  "gui.aipatternizer.type.PROCESSING": "processing",
+  "gui.aipatternizer.type.STONECUTTING": "stonecutting",
+  "gui.aipatternizer.type.SMITHING": "smithing",
 
   "gui.aipatternizer.role.CONSUMED": "",
   "gui.aipatternizer.role.CATALYST_RETURNED": " [catalyst, returned]",

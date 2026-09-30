@@ -156,6 +156,18 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         rebuildDisplay();
         LlmGenerateService.generate(prompt, result -> Minecraft.getInstance().execute(() -> {
             if (result instanceof LlmGenerateService.Result.Ok ok) {
+                // 预检：目标类样板（合成/切石/锻造）在客户端配方本里查无配方时，
+                // 直接给出改道建议，不让玩家走到编码失败那一步（2026-10-01 摩根案）
+                if (!hasRecipeForTarget(ok.spec())) {
+                    setState(State.INPUT);
+                    this.statusLines.add(Component.translatable("gui.aipatternizer.no_recipe",
+                            Component.translatable("gui.aipatternizer.type." + ok.spec().type.name())
+                                    .getString(),
+                            ok.spec().target));
+                    this.statusLines.add(Component.translatable("gui.aipatternizer.no_recipe_hint"));
+                    rebuildDisplay();
+                    return;
+                }
                 this.confirmedSpec = ok.spec();
                 buildPreview(ok.spec());
                 setState(State.PREVIEW);
@@ -167,6 +179,35 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
                 rebuildDisplay();
             }
         }));
+    }
+
+    /** 客户端配方本预检：目标类样板是否有对应类型的配方（保守放行：世界不可用时放行）。 */
+    private static boolean hasRecipeForTarget(PatternSpec spec) {
+        if (spec.type == PatternSpec.Type.PROCESSING || spec.target == null) {
+            return true;
+        }
+        var mc = Minecraft.getInstance();
+        if (mc.level == null) {
+            return true;
+        }
+        var target = ForgeRegistries.ITEMS.getValue(new ResourceLocation(spec.target));
+        if (target == null) {
+            return false;
+        }
+        net.minecraft.world.item.crafting.RecipeType<?> recipeType = switch (spec.type) {
+        case CRAFTING -> net.minecraft.world.item.crafting.RecipeType.CRAFTING;
+        case STONECUTTING -> net.minecraft.world.item.crafting.RecipeType.STONECUTTING;
+        case SMITHING -> net.minecraft.world.item.crafting.RecipeType.SMITHING;
+        default -> null;
+        };
+        if (recipeType == null) {
+            return true;
+        }
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        java.util.List<? extends net.minecraft.world.item.crafting.Recipe<?>> recipes = (java.util.List) mc.level
+                .getRecipeManager().getAllRecipesFor((net.minecraft.world.item.crafting.RecipeType) recipeType);
+        return recipes.stream().anyMatch(
+                r -> r.getResultItem(mc.level.registryAccess()).getItem() == target);
     }
 
     /** 把内部错误码翻译成玩家能懂的提示（§失败要可解释）。 */

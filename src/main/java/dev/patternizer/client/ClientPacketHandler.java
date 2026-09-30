@@ -28,6 +28,9 @@ public final class ClientPacketHandler {
             return;
         }
         mc.player.displayClientMessage(Component.translatable("message.aipatternizer.encode." + result), false);
+        if ("recipe_not_found".equals(result)) {
+            mc.player.displayClientMessage(Component.translatable("gui.aipatternizer.no_recipe_hint"), false);
+        }
         if ("ok".equals(result) && mc.screen instanceof dev.patternizer.client.screen.AiPatternizerScreen aps) {
             aps.onEncodeOk();
         }
