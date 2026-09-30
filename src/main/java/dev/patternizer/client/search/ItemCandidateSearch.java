@@ -33,6 +33,9 @@ public final class ItemCandidateSearch {
 
     public static List<String> search(String prompt, int limit) {
         Set<String> tokens = extractTokens(prompt);
+        Set<String> latinTokens = tokens.stream()
+                .filter(t -> t.chars().anyMatch(c -> c < 0x80 && Character.isLetter(c)))
+                .collect(java.util.stream.Collectors.toSet());
         Set<String> exactRefs = new HashSet<>();
         Matcher refMatcher = REGISTRY_REF.matcher(prompt);
         while (refMatcher.find()) {
@@ -42,6 +45,7 @@ public final class ItemCandidateSearch {
         record Scored(String id, int score) {
         }
         List<Scored> scored = new ArrayList<>();
+        java.util.Map<String, String[]> nsInfoCache = new java.util.HashMap<>();
 
         for (Item item : ForgeRegistries.ITEMS) {
             var id = ForgeRegistries.ITEMS.getKey(item);
@@ -55,23 +59,34 @@ public final class ItemCandidateSearch {
                 score += 1000;
             }
 
-            String displayName = item.getDefaultInstance().getHoverName().getString();
-            String displayLower = displayName.toLowerCase(Locale.ROOT);
+            String displayLower = item.getDefaultInstance().getHoverName().getString()
+                    .toLowerCase(Locale.ROOT);
             String path = id.getPath();
             String namespace = id.getNamespace();
             for (String token : tokens) {
-                if (token.length() < 2) {
-                    continue;
-                }
                 // 大小写不敏感："ATM" 必须能匹配显示名 "ATM镐"（2026-09-30 实测案例）
-                if (displayLower.contains(token)) {
-                    score += token.length() * 4;
+                if (token.length() >= 3 && displayLower.contains(token)) {
+                    score += token.length() * 4; // 长 token（整段 CJK / 拉丁词）
+                } else if (token.length() == 2 && displayLower.contains(token)) {
+                    score += 3; // 二元组固定小权重，防止"合成/样板"类泛词淹没目标
                 }
                 if (path.contains(token)) {
                     score += token.length() * 2;
                 }
-                if (namespace.contains(token)) {
-                    score += 2;
+            }
+
+            // 模组名与缩写匹配（解决 "ATM" ↔ AllTheModium 这类缩写场景）：
+            // 显示名大写首字母组成缩写与拉丁 token 比对，mod 全名子串也可命中
+            if (!latinTokens.isEmpty()) {
+                String[] info = nsInfoCache.computeIfAbsent(namespace, ItemCandidateSearch::modNameInfo);
+                if (info != null) {
+                    for (String token : latinTokens) {
+                        if (info[0].equals(token)) {
+                            score += 30;
+                        } else if (token.length() >= 4 && info[1].contains(token)) {
+                            score += 8;
+                        }
+                    }
                 }
             }
 
@@ -85,6 +100,29 @@ public final class ItemCandidateSearch {
                 .limit(limit)
                 .map(Scored::id)
                 .toList();
+    }
+
+    /**
+     * 取模组的 [大写缩写（小写）, 全名（小写）]，如 AllTheModium → ["atm", "allthemodium"]；
+     * 无模组信息（minecraft 等）返回 null。
+     */
+    private static String[] modNameInfo(String namespace) {
+        try {
+            var container = net.minecraftforge.fml.ModList.get().getModContainerById(namespace);
+            if (container.isEmpty()) {
+                return null;
+            }
+            String name = container.get().getModInfo().getDisplayName();
+            StringBuilder acronym = new StringBuilder();
+            for (char c : name.toCharArray()) {
+                if (Character.isUpperCase(c) || Character.isDigit(c)) {
+                    acronym.append(Character.toLowerCase(c));
+                }
+            }
+            return new String[] { acronym.toString(), name.toLowerCase(Locale.ROOT) };
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** 提取关键词：CJK 连续段整段 + 二元组，拉丁词整词。 */
