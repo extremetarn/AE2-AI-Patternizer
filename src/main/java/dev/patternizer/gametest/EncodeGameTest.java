@@ -165,6 +165,13 @@ public class EncodeGameTest {
                     "AI Patternizer block entity missing");
             var grid = ((dev.patternizer.block.AiPatternizerBlockEntity) be).getGrid();
             helper.assertTrue(grid != null, "grid node not ready: no grid after joining network");
+            // 必须与能源元件并入同一网格（≥2 节点），单节点网格说明线缆/宿主链路不通
+            int nodeCount = 0;
+            for (var ignored : grid.getNodes()) {
+                nodeCount++;
+            }
+            helper.assertTrue(nodeCount >= 2,
+                    "grid has only " + nodeCount + " node(s): block did not join the energy cell's network");
         });
     }
 }

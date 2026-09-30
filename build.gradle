@@ -135,9 +135,11 @@ dependencies {
     // then special handling is done to allow a setup of a vanilla dependency without the use of an external repository.
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // AE2 API (compile-time only) + full AE2 jar and its hard dependency GuideME for dev runtime.
+    // AE2 full jar (compile + dev runtime) + its hard dependency GuideME for dev runtime.
+    // The full jar is required at compile time because grid-node hosting uses classes from
+    // AE2's core packages (appeng.capabilities, appeng.helpers) that are not in the api jar.
     // All go through fg.deobf so their mixins/refmaps match the official dev mappings.
-    compileOnly fg.deobf("blank:appliedenergistics2-forge:15.4.11:api")
+    compileOnly fg.deobf("blank:appliedenergistics2-forge:15.4.11")
     runtimeOnly fg.deobf("blank:appliedenergistics2-forge:15.4.11")
     runtimeOnly fg.deobf("blank:guideme:20.1.15")
 
