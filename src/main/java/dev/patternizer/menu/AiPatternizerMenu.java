@@ -23,8 +23,8 @@ public class AiPatternizerMenu extends AbstractContainerMenu {
     public AiPatternizerMenu(int windowId, Inventory playerInv, BlockPos pos) {
         super(PRegistry.AI_PATTERNIZER_MENU.get(), windowId);
 
-        this.addSlot(new SlotItemHandler(storage, 0, 26, 35));
-        this.addSlot(new SlotItemHandler(storage, 1, 134, 35) {
+        this.addSlot(new SlotItemHandler(storage, 0, 27, 107));
+        this.addSlot(new SlotItemHandler(storage, 1, 135, 107) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return false;
@@ -34,11 +34,11 @@ public class AiPatternizerMenu extends AbstractContainerMenu {
         // 玩家背包与快捷栏
         for (int y = 0; y < 3; y++) {
             for (int x = 0; x < 9; x++) {
-                this.addSlot(new Slot(playerInv, x + y * 9 + 9, 8 + x * 18, 84 + y * 18));
+                this.addSlot(new Slot(playerInv, x + y * 9 + 9, 9 + x * 18, 151 + y * 18));
             }
         }
         for (int x = 0; x < 9; x++) {
-            this.addSlot(new Slot(playerInv, x, 8 + x * 18, 142));
+            this.addSlot(new Slot(playerInv, x, 9 + x * 18, 205));
         }
     }
 

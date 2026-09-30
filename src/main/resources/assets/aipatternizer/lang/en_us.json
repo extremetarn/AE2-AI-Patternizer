@@ -16,6 +16,7 @@
   "gui.aipatternizer.preview.inputs": "Inputs:",
   "gui.aipatternizer.preview.outputs": "Outputs:",
   "gui.aipatternizer.preview.note": "Note: %s",
+  "gui.aipatternizer.more_lines": "... +%s more",
 
   "gui.aipatternizer.role.CONSUMED": "",
   "gui.aipatternizer.role.CATALYST_RETURNED": " [catalyst, returned]",

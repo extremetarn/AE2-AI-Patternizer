@@ -16,6 +16,7 @@
   "gui.aipatternizer.preview.inputs": "输入：",
   "gui.aipatternizer.preview.outputs": "输出：",
   "gui.aipatternizer.preview.note": "说明：%s",
+  "gui.aipatternizer.more_lines": "……还有 %s 行",
 
   "gui.aipatternizer.role.CONSUMED": "",
   "gui.aipatternizer.role.CATALYST_RETURNED": "（催化剂·返还）",

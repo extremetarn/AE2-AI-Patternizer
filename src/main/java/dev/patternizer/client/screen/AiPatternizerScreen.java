@@ -14,6 +14,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import dev.patternizer.AIPatternizer;
 import dev.patternizer.client.llm.LlmGenerateService;
 import dev.patternizer.menu.AiPatternizerMenu;
 import dev.patternizer.net.PatternSpecRequestPacket;
@@ -23,11 +24,18 @@ import dev.patternizer.spec.PatternSpec.Entry;
 import dev.patternizer.spec.PatternSpecJson;
 
 /**
- * AI 样板编写台界面（M2）。
+ * AI 样板编写台界面。
  * 三态：INPUT（输入需求）→ CALLING（调用 LLM）→ PREVIEW（预览确认后发包编码）。
  * 预览面板是交互安全闸（§4.1）：AI 输出未经玩家确认不会落地。
+ *
+ * 布局（176×222，底图 assets/aipatternizer/textures/gui/ai_patternizer.png）：
+ * 标题 y=5；输入框 16..34；状态/预览凹槽 38..100；机器槽 106；按钮 128；背包 150/204。
  */
 public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMenu> {
+
+    private static final ResourceLocation GUI_TEXTURE = new ResourceLocation(AIPatternizer.MOD_ID,
+            "textures/gui/ai_patternizer.png");
+    private static final int MAX_TEXT_LINES = 5;
 
     private enum State {
         INPUT, CALLING, PREVIEW
@@ -44,29 +52,29 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
     public AiPatternizerScreen(AiPatternizerMenu menu, Inventory playerInv, Component title) {
         super(menu, playerInv, title);
         this.imageWidth = 176;
-        this.imageHeight = 166;
+        this.imageHeight = 222;
     }
 
     @Override
     protected void init() {
         super.init();
 
-        this.promptBox = new EditBox(this.font, this.leftPos + 8, this.topPos + 8,
-                this.imageWidth - 16, 18,
+        this.promptBox = new EditBox(this.font, this.leftPos + 10, this.topPos + 16, 156, 18,
                 Component.translatable("gui.aipatternizer.prompt_hint"));
         this.promptBox.setHint(Component.translatable("gui.aipatternizer.prompt_hint"));
         this.promptBox.setMaxLength(256);
+        this.promptBox.setBordered(true);
         this.addRenderableWidget(this.promptBox);
 
         this.actionButton = this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.aipatternizer.generate"),
                 btn -> onAction())
-                .bounds(this.leftPos + 8, this.topPos + 140, 80, 20)
+                .bounds(this.leftPos + 8, this.topPos + 128, 80, 20)
                 .build());
         this.backButton = this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.aipatternizer.back"),
                 btn -> setState(State.INPUT))
-                .bounds(this.leftPos + 92, this.topPos + 140, 76, 20)
+                .bounds(this.leftPos + 92, this.topPos + 128, 76, 20)
                 .build());
 
         setState(State.INPUT);
@@ -77,19 +85,16 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         this.statusLines.clear();
         switch (newState) {
         case INPUT -> {
-            this.promptBox.visible = true;
             this.actionButton.setMessage(Component.translatable("gui.aipatternizer.generate"));
             this.actionButton.active = true;
             this.backButton.visible = false;
         }
         case CALLING -> {
-            this.promptBox.visible = true;
             this.actionButton.active = false;
             this.backButton.visible = true;
             this.backButton.setMessage(Component.translatable("gui.aipatternizer.cancel"));
         }
         case PREVIEW -> {
-            this.promptBox.visible = false;
             this.actionButton.setMessage(Component.translatable("gui.aipatternizer.confirm"));
             this.actionButton.active = true;
             this.backButton.visible = true;
@@ -142,12 +147,10 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
 
     private void buildPreview(PatternSpec spec) {
         this.previewLines.clear();
-        this.previewLines.add(Component.translatable("gui.aipatternizer.preview.title"));
         if (spec.type != PatternSpec.Type.PROCESSING) {
             this.previewLines.add(Component.translatable("gui.aipatternizer.preview.crafting_target",
                     displayNameOf(spec.target)));
-        }
-        if (spec.type == PatternSpec.Type.PROCESSING) {
+        } else {
             this.previewLines.add(Component.translatable("gui.aipatternizer.preview.inputs"));
             for (Entry e : spec.inputs) {
                 this.previewLines.add(Component.literal("  " + describeEntry(e)));
@@ -182,10 +185,8 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        int x = this.leftPos;
-        int y = this.topPos;
-        graphics.fill(x, y, x + this.imageWidth, y + this.imageHeight, 0xFFC6C6C6);
-        graphics.fill(x + 3, y + 3, x + this.imageWidth - 3, y + this.imageHeight - 3, 0xFF3B3F4C);
+        graphics.blit(GUI_TEXTURE, this.leftPos, this.topPos, 0, 0,
+                this.imageWidth, this.imageHeight, this.imageWidth, this.imageHeight);
     }
 
     @Override
@@ -193,12 +194,20 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         this.renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
 
-        int textX = this.leftPos + 8;
-        int textY = this.topPos + 32;
+        graphics.drawString(this.font, this.title, this.leftPos + 8, this.topPos + 5, 0xFF404040, false);
+
         List<Component> lines = this.state == State.PREVIEW ? this.previewLines : this.statusLines;
-        for (Component line : lines) {
-            graphics.drawString(this.font, line, textX, textY, 0xFFFFFFFF, false);
+        int textX = this.leftPos + 12;
+        int textY = this.topPos + 43;
+        int shown = Math.min(lines.size(), MAX_TEXT_LINES);
+        for (int i = 0; i < shown; i++) {
+            graphics.drawString(this.font, lines.get(i), textX, textY, 0xFFFFFFFF, false);
             textY += 10;
+        }
+        if (lines.size() > shown) {
+            graphics.drawString(this.font,
+                    Component.translatable("gui.aipatternizer.more_lines", lines.size() - shown),
+                    textX, textY, 0xFFAAAAAA, false);
         }
 
         this.renderTooltip(graphics, mouseX, mouseY);
@@ -206,6 +215,6 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        // 标题由 render() 中的状态行区域统一绘制，避免与输入框重叠
+        // 标题与状态行在 render() 中按绝对坐标绘制
     }
 }
