@@ -11,6 +11,9 @@ logs/
 # Local binary dependencies (AE2 jars, downloaded from GitHub releases)
 libs/
 
+# Internal design documents (kept locally, never committed)
+AI-Patternizer-设计方案.md
+
 # IDE
 .idea/
 *.iml
