@@ -41,8 +41,42 @@ public final class ItemCandidateSearch {
         while (refMatcher.find()) {
             exactRefs.add(refMatcher.group().toLowerCase(Locale.ROOT));
         }
+        String longestCjk = tokens.stream()
+                .filter(t -> t.chars().anyMatch(c -> c >= 0x4e00 && c <= 0x9fff))
+                .max(Comparator.comparingInt(String::length))
+                .orElse(null);
 
-        record Scored(String id, int score) {
+        // 第一遍：统计每个关键词的文档频率 df（出现在多少物品的名称/路径中）
+        // —— IDF 的核心：泛词（"合成/样板"，df 几千）权重自然低于专词（"atm"，df 几十）
+        java.util.Map<String, Integer> df = new java.util.HashMap<>();
+        int totalItems = 0;
+        for (Item item : ForgeRegistries.ITEMS) {
+            var id = ForgeRegistries.ITEMS.getKey(item);
+            if (id == null) {
+                continue;
+            }
+            totalItems++;
+            String displayLower = item.getDefaultInstance().getHoverName().getString()
+                    .toLowerCase(Locale.ROOT);
+            String path = id.getPath();
+            for (String token : tokens) {
+                if (df.getOrDefault(token, 0) >= DF_CAP) {
+                    continue;
+                }
+                if (displayLower.contains(token) || path.contains(token)) {
+                    df.merge(token, 1, Integer::sum);
+                }
+            }
+        }
+
+        final int n = Math.max(1, totalItems);
+        java.util.Map<String, Double> idf = new java.util.HashMap<>();
+        for (String token : tokens) {
+            idf.put(token, Math.log(1.0 + n / (1.0 + df.getOrDefault(token, 0))));
+        }
+
+        // 第二遍：按字段加权的相关度打分
+        record Scored(String id, double score) {
         }
         List<Scored> scored = new ArrayList<>();
         java.util.Map<String, String[]> nsInfoCache = new java.util.HashMap<>();
@@ -53,7 +87,7 @@ public final class ItemCandidateSearch {
                 continue;
             }
             String idStr = id.toString();
-            int score = 0;
+            double score = 0;
 
             if (exactRefs.contains(idStr)) {
                 score += 1000;
@@ -62,29 +96,30 @@ public final class ItemCandidateSearch {
             String displayLower = item.getDefaultInstance().getHoverName().getString()
                     .toLowerCase(Locale.ROOT);
             String path = id.getPath();
-            String namespace = id.getNamespace();
             for (String token : tokens) {
-                // 大小写不敏感："ATM" 必须能匹配显示名 "ATM镐"（2026-09-30 实测案例）
-                if (token.length() >= 3 && displayLower.contains(token)) {
-                    score += token.length() * 4; // 长 token（整段 CJK / 拉丁词）
-                } else if (token.length() == 2 && displayLower.contains(token)) {
-                    score += 3; // 二元组固定小权重，防止"合成/样板"类泛词淹没目标
+                double w = idf.get(token);
+                if (displayLower.contains(token)) {
+                    score += w * 4;
                 }
                 if (path.contains(token)) {
-                    score += token.length() * 2;
+                    score += w * 2;
                 }
             }
+            // 显示名与用户输入的最长 CJK 段完全相等（用户精确输入物品名）
+            if (longestCjk != null && displayLower.equals(longestCjk)) {
+                score += 20;
+            }
 
-            // 模组名与缩写匹配（解决 "ATM" ↔ AllTheModium 这类缩写场景）：
-            // 显示名大写首字母组成缩写与拉丁 token 比对，mod 全名子串也可命中
+            // 模组名与缩写匹配（"ATM" ↔ AllTheModium 缩写场景）
             if (!latinTokens.isEmpty()) {
-                String[] info = nsInfoCache.computeIfAbsent(namespace, ItemCandidateSearch::modNameInfo);
+                String[] info = nsInfoCache.computeIfAbsent(id.getNamespace(),
+                        ItemCandidateSearch::modNameInfo);
                 if (info != null) {
                     for (String token : latinTokens) {
                         if (info[0].equals(token)) {
-                            score += 30;
+                            score += idf.get(token) * 8;
                         } else if (token.length() >= 4 && info[1].contains(token)) {
-                            score += 8;
+                            score += idf.get(token) * 2;
                         }
                     }
                 }
@@ -96,11 +131,13 @@ public final class ItemCandidateSearch {
         }
 
         return scored.stream()
-                .sorted(Comparator.comparingInt(Scored::score).reversed())
+                .sorted(Comparator.comparingDouble(Scored::score).reversed())
                 .limit(limit)
                 .map(Scored::id)
                 .toList();
     }
+
+    private static final int DF_CAP = 5000;
 
     /**
      * 取模组的 [大写缩写（小写）, 全名（小写）]，如 AllTheModium → ["atm", "allthemodium"]；
