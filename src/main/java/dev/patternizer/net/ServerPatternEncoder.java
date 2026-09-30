@@ -27,6 +27,8 @@ import dev.patternizer.spec.PatternSpecValidator.ValidationError;
  */
 public final class ServerPatternEncoder {
 
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+
     private static final ResourceLocation BLANK_PATTERN_ID = new ResourceLocation("ae2", "blank_pattern");
 
     private ServerPatternEncoder() {
@@ -83,6 +85,7 @@ public final class ServerPatternEncoder {
         try {
             resolution = RecipeResolver.resolveAndEncode(player.server, player.level(), spec);
         } catch (Exception e) {
+            LOGGER.warn("encodeFromSpec threw for spec {}: {}", specJson, e.toString());
             refundBlankPattern(grid, player, storage, blankPattern, blankFromGrid, source);
             return new String[] { "encode_failed", e.getClass().getSimpleName() };
         }
@@ -92,6 +95,8 @@ public final class ServerPatternEncoder {
             return new String[] { "choose_recipe", String.join("\n", choose.recipeIds()) };
         }
         if (resolution instanceof RecipeResolver.Resolution.Failed failed) {
+            LOGGER.warn("encodeFromSpec failed [{}] {} for target={} type={}",
+                    failed.code(), failed.detail(), spec.target, spec.type);
             refundBlankPattern(grid, player, storage, blankPattern, blankFromGrid, source);
             return new String[] { failed.code(), failed.detail() };
         }

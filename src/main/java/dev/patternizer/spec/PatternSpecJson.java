@@ -41,8 +41,7 @@ public final class PatternSpecJson {
         }
 
         PatternSpec spec = new PatternSpec();
-        spec.type = parseEnum(PatternSpec.Type.class, optString(root, "type", "processing"),
-                PatternSpec.Type.PROCESSING);
+        spec.type = parseType(optString(root, "type", "processing"));
         spec.target = optString(root, "target", null);
         spec.recipeId = optString(root, "recipe_id", null);
 
@@ -170,6 +169,31 @@ public final class PatternSpecJson {
             throw new SpecParseException("error.spec.entry_item_xor_fluid|" + o);
         }
         return e;
+    }
+
+    private static final java.util.Map<String, String> TYPE_ALIASES = java.util.Map.ofEntries(
+            java.util.Map.entry("smithing_table", "smithing"),
+            java.util.Map.entry("forge", "smithing"),
+            java.util.Map.entry("forging", "smithing"),
+            java.util.Map.entry("upgrade", "smithing"),
+            java.util.Map.entry("trim", "smithing"),
+            java.util.Map.entry("stonecut", "stonecutting"),
+            java.util.Map.entry("stonecutter", "stonecutting"),
+            java.util.Map.entry("cutting", "stonecutting"),
+            java.util.Map.entry("craft", "crafting"),
+            java.util.Map.entry("crafting_table", "crafting"),
+            java.util.Map.entry("process", "processing"),
+            java.util.Map.entry("machine", "processing"));
+
+    /** 解析 type 字段：先按别名表归一，再按枚举解析（非法值回退 processing）。 */
+    private static PatternSpec.Type parseType(String raw) {
+        if (raw != null) {
+            String alias = TYPE_ALIASES.get(raw.trim().toLowerCase(Locale.ROOT));
+            if (alias != null) {
+                raw = alias;
+            }
+        }
+        return parseEnum(PatternSpec.Type.class, raw, PatternSpec.Type.PROCESSING);
     }
 
     private static <T extends Enum<T>> T parseEnum(Class<T> cls, String raw, T fallback) {

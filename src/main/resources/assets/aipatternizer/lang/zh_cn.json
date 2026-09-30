@@ -42,7 +42,7 @@
   "message.aipatternizer.encode.no_blank_pattern": "[AI 样板编写台] 请先在左侧槽位放入空白样板。",
   "message.aipatternizer.encode.no_menu": "[AI 样板编写台] 内部错误：容器未打开。",
   "message.aipatternizer.encode.invalid_spec": "[AI 样板编写台] 规格未通过服务端校验：",
-  "message.aipatternizer.encode.unsupported_type": "[AI 样板编写台] 该样板类型暂不支持（M3 提供）：",
+  "message.aipatternizer.encode.unsupported_type": "[AI 样板编写台] 该配方类型暂无法编码：",
   "message.aipatternizer.encode.recipe_not_found": "[AI 样板编写台] 找不到该物品的合成配方：",
   "message.aipatternizer.encode.encode_failed": "[AI 样板编写台] 编码失败：",
 

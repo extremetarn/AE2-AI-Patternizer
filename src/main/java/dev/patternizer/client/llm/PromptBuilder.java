@@ -17,8 +17,13 @@ public final class PromptBuilder {
                 你是 Minecraft 模组 AE2（应用能源2）的样板编写助手。规则：
                 1. 只输出一个符合下述 JSON Schema 的 JSON 对象，不要输出任何其他文字、解释或代码块标记。
                 2. 物品与流体必须使用 "modid:name" 注册名，且只能使用 <候选清单> 中出现的注册名，禁止编造。
-                3. 样板类型 type 只允许 "crafting"（合成样板）或 "processing"（处理样板）。
-                4. crafting：只给 target（目标产物注册名），真实配方由游戏内查询，不要给 inputs/outputs。
+                3. 样板类型 type 只能是以下四种之一：
+                   - "crafting"（合成样板，工作台配方）
+                   - "processing"（处理样板，外置机器/装置处理，可含流体）
+                   - "stonecutting"（切石样板，切石机配方）
+                   - "smithing"（锻造样板，锻造台配方，如升级、纹饰）
+                4. crafting / stonecutting / smithing：只给 target（目标产物注册名），
+                   真实配方与配料由游戏内查询，不要给 inputs/outputs。
                 5. processing：给出完整 inputs 与 outputs。每个输入/输出是
                    {"item":"modid:name","count":数量} 或 {"fluid":"modid:name","amount":毫桶}。
                 6. 若玩家说明某输入「不消耗 / 催化剂 / 可循环使用」，该输入标注 "role":"catalyst_returned"，

@@ -42,7 +42,7 @@
   "message.aipatternizer.encode.no_blank_pattern": "[AI Patternizer] Put a Blank Pattern into the left slot first.",
   "message.aipatternizer.encode.no_menu": "[AI Patternizer] Internal error: menu is not open.",
   "message.aipatternizer.encode.invalid_spec": "[AI Patternizer] Spec rejected by server validation:",
-  "message.aipatternizer.encode.unsupported_type": "[AI Patternizer] This pattern type is not supported yet (coming in M3):",
+  "message.aipatternizer.encode.unsupported_type": "[AI Patternizer] This recipe type cannot be encoded:",
   "message.aipatternizer.encode.recipe_not_found": "[AI Patternizer] No crafting recipe found for:",
   "message.aipatternizer.encode.encode_failed": "[AI Patternizer] Encoding failed:",
 
