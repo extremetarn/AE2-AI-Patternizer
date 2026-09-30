@@ -1,0 +1,8 @@
+{
+  "block.aipatternizer.ai_patternizer": "AI 样板编写台",
+  "gui.aipatternizer.prompt_hint": "用自然语言描述你需要的样板（M2 接入 LLM）……",
+  "gui.aipatternizer.generate": "生成测试样板",
+  "message.aipatternizer.encode.ok": "[AI 样板编写台] 已编码测试处理样板：1 铁锭 → 9 铁粒。",
+  "message.aipatternizer.encode.no_blank_pattern": "[AI 样板编写台] 请先在左侧槽位放入空白样板。",
+  "message.aipatternizer.encode.no_menu": "[AI 样板编写台] 内部错误：容器未打开。"
+}

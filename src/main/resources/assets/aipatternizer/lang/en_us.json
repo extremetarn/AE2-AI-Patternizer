@@ -1,0 +1,8 @@
+{
+  "block.aipatternizer.ai_patternizer": "AI Patternizer",
+  "gui.aipatternizer.prompt_hint": "Describe the pattern you need (LLM wiring arrives in M2)...",
+  "gui.aipatternizer.generate": "Generate Test Pattern",
+  "message.aipatternizer.encode.ok": "[AI Patternizer] Encoded test processing pattern: 1 iron ingot -> 9 iron nuggets.",
+  "message.aipatternizer.encode.no_blank_pattern": "[AI Patternizer] Put a Blank Pattern into the left slot first.",
+  "message.aipatternizer.encode.no_menu": "[AI Patternizer] Internal error: menu is not open."
+}

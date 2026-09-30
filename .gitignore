@@ -8,6 +8,9 @@ run/
 runs/
 logs/
 
+# Local binary dependencies (AE2 jars, downloaded from GitHub releases)
+libs/
+
 # IDE
 .idea/
 *.iml
