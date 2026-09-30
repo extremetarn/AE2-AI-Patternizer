@@ -12,6 +12,7 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.ItemStackHandler;
 
+import appeng.api.networking.GridFlags;
 import appeng.api.networking.GridHelper;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
@@ -47,6 +48,8 @@ public class AiPatternizerBlockEntity extends BlockEntity
         super(PRegistry.AI_PATTERNIZER_BE.get(), pos, state);
         this.gridNode = GridHelper.createManagedNode(this, this);
         this.gridNode.setIdlePowerUsage(1.0);
+        // 占用 1 个频道：有控制器的网络中，不带 REQUIRE_CHANNEL 的节点无法上线
+        this.gridNode.setFlags(GridFlags.REQUIRE_CHANNEL);
         // 关键：默认不可被其他节点在世界中发现——必须显式开启，否则线缆永远连不上
         this.gridNode.setInWorldNode(true);
         this.gridNode.setVisualRepresentation(new ItemStack(PRegistry.AI_PATTERNIZER_ITEM.get()));

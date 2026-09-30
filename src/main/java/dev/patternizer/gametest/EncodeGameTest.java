@@ -147,31 +147,41 @@ public class EncodeGameTest {
         helper.succeed();
     }
 
-    /** 网格接入：编写台与创造能源元件相邻时应成功加入 ME 网络。 */
+    /** 网格接入：编写台与创造能源元件 + 控制器组网时应成功加入 ME 网络并上线。 */
     @GameTest(template = "empty")
     public static void gridConnection(GameTestHelper helper) {
         var energyCell = ForgeRegistries.ITEMS.getValue(new ResourceLocation("ae2", "creative_energy_cell"));
         helper.assertTrue(energyCell != null, "ae2:creative_energy_cell not found in registry");
+        var controller = ForgeRegistries.ITEMS.getValue(new ResourceLocation("ae2", "controller"));
+        helper.assertTrue(controller != null, "ae2:controller not found in registry");
         var cellBlock = net.minecraft.world.level.block.Block.byItem(energyCell);
+        var controllerBlock = net.minecraft.world.level.block.Block.byItem(controller);
 
+        // 复刻有控制器的真实网络：能源元件 — 控制器 — 编写台
         net.minecraft.core.BlockPos cellPos = new net.minecraft.core.BlockPos(1, 2, 1);
+        net.minecraft.core.BlockPos controllerPos = new net.minecraft.core.BlockPos(1, 2, 2);
         net.minecraft.core.BlockPos benchPos = new net.minecraft.core.BlockPos(2, 2, 1);
         helper.setBlock(cellPos, cellBlock);
+        helper.setBlock(controllerPos, controllerBlock);
         helper.setBlock(benchPos, dev.patternizer.registry.PRegistry.AI_PATTERNIZER.get());
 
         helper.succeedWhen(() -> {
             var be = helper.getBlockEntity(benchPos);
             helper.assertTrue(be instanceof dev.patternizer.block.AiPatternizerBlockEntity,
                     "AI Patternizer block entity missing");
-            var grid = ((dev.patternizer.block.AiPatternizerBlockEntity) be).getGrid();
+            var pbe = (dev.patternizer.block.AiPatternizerBlockEntity) be;
+            var grid = pbe.getGrid();
             helper.assertTrue(grid != null, "grid node not ready: no grid after joining network");
-            // 必须与能源元件并入同一网格（≥2 节点），单节点网格说明线缆/宿主链路不通
+            // 必须与能源元件+控制器并入同一网格，单节点网格说明线缆/宿主链路不通
             int nodeCount = 0;
             for (var ignored : grid.getNodes()) {
                 nodeCount++;
             }
-            helper.assertTrue(nodeCount >= 2,
-                    "grid has only " + nodeCount + " node(s): block did not join the energy cell's network");
+            helper.assertTrue(nodeCount >= 3,
+                    "grid has only " + nodeCount + " node(s): block did not join the network");
+            // 有控制器时必须拿到频道上线（REQUIRE_CHANNEL 生效）
+            helper.assertTrue(pbe.getGridNode().isOnline(),
+                    "grid node is not online on a controller network (channel not acquired?)");
         });
     }
 }
