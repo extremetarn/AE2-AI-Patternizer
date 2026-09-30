@@ -33,11 +33,14 @@ public final class PromptBuilder {
                    同时把 inputs 里消耗品数量与 outputs 数量按「一件工具能做 uses_per_tool 次」折批。
                 8. 若玩家说某物「已预置在机器里」，标注 "role":"catalyst_preplaced"，且不得写入 outputs。
                 9. 默认 role 为 "consumed"。输出数量 count≥1，流体 amount≥1。
-                10. note 字段用中文简要说明你的判断理由（选路/催化剂策略）。
+                10. options.allow_substitutes（原料等价替换）默认写 true——木棍/矿锭这类配方必须允许
+                   替换；仅当玩家明确要求「锁死某一种材料」时才写 false。
+                   allow_fluid_substitutes 默认 false。
+                11. note 字段用中文简要说明你的判断理由（选路/催化剂策略）。
                 JSON Schema:
                 {"type":"...","target":"...","inputs":[...],"outputs":[...],
                  "durability_batch":{"tool":"...","uses_per_tool":1},"note":"...",
-                 "options":{"allow_substitutes":false,"allow_fluid_substitutes":false}}
+                 "options":{"allow_substitutes":true,"allow_fluid_substitutes":false}}
                 """;
     }
 
