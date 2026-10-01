@@ -36,6 +36,8 @@ import dev.patternizer.spec.PatternSpecJson;
  */
 public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMenu> {
 
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+
     private static final ResourceLocation GUI_TEXTURE = new ResourceLocation(AIPatternizer.MOD_ID,
             "textures/gui/ai_patternizer.png");
 
@@ -94,7 +96,11 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
                 .build());
         this.backButton = this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.aipatternizer.back"),
-                btn -> setState(State.INPUT))
+                btn -> {
+                    this.statusLines.clear();
+                    this.streamText = "";
+                    setState(State.INPUT);
+                })
                 .bounds(this.leftPos + 92, this.topPos + 128, 76, 20)
                 .build());
         this.lineButton = this.addRenderableWidget(Button.builder(
@@ -108,7 +114,8 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
 
     private void setState(State newState) {
         this.state = newState;
-        this.statusLines.clear();
+        // 注意：不在此清空 statusLines——LINE_PLAN/LINE_DONE 的内容是在 setState 之前填充的
+        // （2026-10-01：此前 setState 先清后填导致整线报告"闪一下就消失"）
         switch (newState) {
         case INPUT -> {
             this.actionButton.setMessage(Component.translatable("gui.aipatternizer.generate"));
@@ -178,7 +185,7 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         }
     }
 
-    /** 整线补齐：用检索器 Top1 候选作为目标（不走 LLM，确定性分析）。 */
+    /** 整线补齐：显示名精确匹配优先，否则检索 Top1（不走 LLM，确定性分析）。 */
     private void startLinePlan() {
         String prompt = this.promptBox.getValue().trim();
         if (prompt.isEmpty()) {
@@ -187,18 +194,40 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
             rebuildDisplay();
             return;
         }
-        List<String> candidates = dev.patternizer.client.search.ItemCandidateSearch.search(prompt, 1);
-        if (candidates.isEmpty()) {
+        String target = resolveLineTarget(prompt);
+        if (target == null) {
             this.statusLines.clear();
             this.statusLines.add(Component.translatable("gui.aipatternizer.status.no_target"));
             rebuildDisplay();
             return;
         }
         setState(State.LINE_WAIT);
+        this.statusLines.clear();
         this.statusLines.add(Component.translatable("gui.aipatternizer.status.analyzing")
                 .withStyle(net.minecraft.ChatFormatting.YELLOW));
         rebuildDisplay();
-        PatternizerNetwork.CHANNEL.sendToServer(new LinePlanRequestPacket(candidates.get(0), 1));
+        PatternizerNetwork.CHANNEL.sendToServer(new LinePlanRequestPacket(target, 1));
+    }
+
+    /** 整线目标解析：输入去掉「的样板/样板」后缀后与物品显示名精确相等者优先，否则取检索 Top1。 */
+    private String resolveLineTarget(String prompt) {
+        String cleaned = prompt.replaceAll("(的)?(合成)?样板$", "").trim().toLowerCase(java.util.Locale.ROOT);
+        if (!cleaned.isEmpty()) {
+            for (var item : ForgeRegistries.ITEMS) {
+                var id = ForgeRegistries.ITEMS.getKey(item);
+                if (id == null) {
+                    continue;
+                }
+                String display = item.getDefaultInstance().getHoverName().getString()
+                        .toLowerCase(java.util.Locale.ROOT);
+                if (display.equals(cleaned)) {
+                    LOGGER.info("[aipatternizer] line target exact match: {} -> {}", cleaned, id);
+                    return id.toString();
+                }
+            }
+        }
+        List<String> candidates = dev.patternizer.client.search.ItemCandidateSearch.search(prompt, 1);
+        return candidates.isEmpty() ? null : candidates.get(0);
     }
 
     /** S2C 整线方案回执：展示缺口汇总，等玩家确认批量编码。 */
@@ -249,6 +278,7 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
             return;
         }
         setState(State.CALLING);
+        this.statusLines.clear();
         this.statusLines.add(Component.translatable("gui.aipatternizer.stage.generating")
                 .withStyle(net.minecraft.ChatFormatting.YELLOW));
         rebuildDisplay();
@@ -280,6 +310,7 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
                 // 直接给出改道建议，不让玩家走到编码失败那一步（2026-10-01 摩根案）
                 if (!hasRecipeForTarget(ok.spec())) {
                     setState(State.INPUT);
+                    this.statusLines.clear();
                     this.statusLines.add(Component.translatable("gui.aipatternizer.no_recipe",
                             ok.spec().target));
                     this.statusLines.add(Component.translatable("gui.aipatternizer.no_recipe_hint"));
@@ -291,6 +322,7 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
                 setState(State.PREVIEW);
             } else if (result instanceof LlmGenerateService.Result.Failed failed) {
                 setState(State.INPUT);
+                this.statusLines.clear();
                 for (String line : failed.errorLines()) {
                     this.statusLines.add(describeError(line));
                 }
