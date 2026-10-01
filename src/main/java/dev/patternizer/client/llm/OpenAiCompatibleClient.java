@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -92,6 +93,49 @@ public final class OpenAiCompatibleClient {
         return future;
     }
 
+    /**
+     * SSE 流式生成：stream=true，逐 chunk 回调 onDelta（累计全文），
+     * 完成后 future 拿到全文。端点不支持流式时回退为一次性 JSON 解析。
+     */
+    public CompletableFuture<String> chatCompleteStream(List<Message> messages, Consumer<String> onDelta) {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        sendStreamWithBackoff(messages, 0, onDelta, future);
+        return future;
+    }
+
+    private HttpRequest buildRequest(List<Message> messages, boolean stream) {
+        String baseUrl = PatternizerClientConfig.BASE_URL.get().trim();
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        JsonObject body = new JsonObject();
+        body.addProperty("model", PatternizerClientConfig.MODEL.get().trim());
+        body.addProperty("temperature", PatternizerClientConfig.TEMPERATURE.get());
+        if (stream) {
+            body.addProperty("stream", true);
+        } else {
+            JsonObject responseFormat = new JsonObject();
+            responseFormat.addProperty("type", "json_object");
+            body.add("response_format", responseFormat);
+        }
+        JsonArray arr = new JsonArray();
+        for (Message m : messages) {
+            JsonObject o = new JsonObject();
+            o.addProperty("role", m.role());
+            o.addProperty("content", m.content());
+            arr.add(o);
+        }
+        body.add("messages", arr);
+
+        return HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/chat/completions"))
+                .timeout(Duration.ofSeconds(PatternizerClientConfig.TIMEOUT_SECONDS.get()))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + PatternizerClientConfig.API_KEY.get().trim())
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                .build();
+    }
+
     /** 拉取可用模型列表（GET {baseUrl}/models），同时兼作连接测试。 */
     public CompletableFuture<List<String>> fetchModels() {
         CompletableFuture<List<String>> future = new CompletableFuture<>();
@@ -146,33 +190,7 @@ public final class OpenAiCompatibleClient {
             future.completeExceptionally(new LlmException("error.llm.no_api_key", false));
             return;
         }
-        String baseUrl = PatternizerClientConfig.BASE_URL.get().trim();
-        if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-        }
-
-        JsonObject body = new JsonObject();
-        body.addProperty("model", PatternizerClientConfig.MODEL.get().trim());
-        body.addProperty("temperature", PatternizerClientConfig.TEMPERATURE.get());
-        JsonObject responseFormat = new JsonObject();
-        responseFormat.addProperty("type", "json_object");
-        body.add("response_format", responseFormat);
-        JsonArray arr = new JsonArray();
-        for (Message m : messages) {
-            JsonObject o = new JsonObject();
-            o.addProperty("role", m.role());
-            o.addProperty("content", m.content());
-            arr.add(o);
-        }
-        body.add("messages", arr);
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/chat/completions"))
-                .timeout(Duration.ofSeconds(PatternizerClientConfig.TIMEOUT_SECONDS.get()))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                .build();
+        HttpRequest request = buildRequest(messages, false);
 
         http.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .whenComplete((response, error) -> {
@@ -204,6 +222,84 @@ public final class OpenAiCompatibleClient {
                                 new LlmException("error.llm.http|" + status, retryable));
                     }
                 });
+    }
+
+    /** SSE 流式发送：逐行读 data: 块，累计全文回调 onDelta。 */
+    private void sendStreamWithBackoff(List<Message> messages, int backoffAttempt,
+            Consumer<String> onDelta, CompletableFuture<String> future) {
+        String apiKey = PatternizerClientConfig.API_KEY.get().trim();
+        if (apiKey.isEmpty()) {
+            future.completeExceptionally(new LlmException("error.llm.no_api_key", false));
+            return;
+        }
+        HttpRequest request = buildRequest(messages, true);
+
+        http.sendAsync(request, HttpResponse.BodyHandlers.ofLines())
+                .whenComplete((response, error) -> {
+                    if (error != null) {
+                        LOGGER.warn("[aipatternizer] LLM stream IO error: {}", error.toString());
+                        retryOrFailStream(messages, backoffAttempt, onDelta, future,
+                                new LlmException("error.llm.io|" + rootCauseName(error), true));
+                        return;
+                    }
+                    int status = response.statusCode();
+                    if (status < 200 || status >= 300) {
+                        String head = "";
+                        try (var lines = response.body()) {
+                            head = lines.limit(4).reduce("", (a, b) -> a + b);
+                        }
+                        LOGGER.warn("[aipatternizer] LLM stream HTTP {}: {}", status, abbreviate(head));
+                        boolean retryable = status == 429 || status >= 500;
+                        retryOrFailStream(messages, backoffAttempt, onDelta, future,
+                                new LlmException("error.llm.http|" + status, retryable));
+                        return;
+                    }
+                    CompletableFuture.runAsync(() -> {
+                        StringBuilder sb = new StringBuilder();
+                        try (var lines = response.body()) {
+                            lines.forEach(line -> {
+                                if (!line.startsWith("data:")) {
+                                    return;
+                                }
+                                String payload = line.substring(5).trim();
+                                if ("[DONE]".equals(payload) || payload.isEmpty()) {
+                                    return;
+                                }
+                                try {
+                                    JsonObject chunk = JsonParser.parseString(payload).getAsJsonObject();
+                                    var choices = chunk.getAsJsonArray("choices");
+                                    if (choices == null || choices.isEmpty()) {
+                                        return;
+                                    }
+                                    var delta = choices.get(0).getAsJsonObject().getAsJsonObject("delta");
+                                    if (delta != null && delta.has("content")) {
+                                        sb.append(delta.get("content").getAsString());
+                                        onDelta.accept(sb.toString());
+                                    }
+                                } catch (Exception ignored) {
+                                    // 单个 chunk 解析失败跳过（心跳/注释行等）
+                                }
+                            });
+                            future.complete(sb.toString());
+                        } catch (Exception e) {
+                            LOGGER.warn("[aipatternizer] LLM stream read error: {}", e.toString());
+                            future.completeExceptionally(
+                                    new LlmException("error.llm.io|" + rootCauseName(e), true));
+                        }
+                    });
+                });
+    }
+
+    private void retryOrFailStream(List<Message> messages, int backoffAttempt, Consumer<String> onDelta,
+            CompletableFuture<String> future, LlmException error) {
+        if (error.retryable() && backoffAttempt < MAX_BACKOFF_RETRIES) {
+            long delay = BACKOFF_SECONDS[Math.min(backoffAttempt, BACKOFF_SECONDS.length - 1)];
+            CompletableFuture.runAsync(
+                    () -> sendStreamWithBackoff(messages, backoffAttempt + 1, onDelta, future),
+                    CompletableFuture.delayedExecutor(delay, TimeUnit.SECONDS));
+        } else {
+            future.completeExceptionally(error);
+        }
     }
 
     private void retryOrFail(List<Message> messages, int backoffAttempt,

@@ -26,6 +26,11 @@ public final class ClientPacketHandler {
             aps.openRecipeChoice(List.of(detail.split("\n")));
             return;
         }
+        // 非成功结果：清掉编写台界面上的阶段指示行
+        if (!"ok".equals(result) && !"choose_recipe".equals(result)
+                && mc.screen instanceof dev.patternizer.client.screen.AiPatternizerScreen aps) {
+            aps.clearStatus();
+        }
         mc.player.displayClientMessage(Component.translatable("message.aipatternizer.encode." + result), false);
         if ("recipe_not_found".equals(result)) {
             mc.player.displayClientMessage(Component.translatable("gui.aipatternizer.no_recipe_hint"), false);

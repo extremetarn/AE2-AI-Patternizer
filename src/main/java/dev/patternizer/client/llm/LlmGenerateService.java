@@ -30,6 +30,20 @@ public final class LlmGenerateService {
         }
     }
 
+    /** 生成过程进度回调（非黑箱原则）：轮次开始 + SSE 流式增量。 */
+    public interface ProgressListener {
+        ProgressListener NONE = new ProgressListener() {
+        };
+
+        /** 新一轮 LLM 调用开始（attempt 从 0 起）。 */
+        default void onAttemptStart(int attempt) {
+        }
+
+        /** SSE 流式输出：textSoFar 为当前累计全文。 */
+        default void onDelta(String textSoFar) {
+        }
+    }
+
     private LlmGenerateService() {
     }
 
@@ -37,6 +51,10 @@ public final class LlmGenerateService {
      * @param prompt 玩家自然语言需求（必须在客户端线程调用，检索器要读译名）
      */
     public static void generate(String prompt, Consumer<Result> callback) {
+        generate(prompt, ProgressListener.NONE, callback);
+    }
+
+    public static void generate(String prompt, ProgressListener progress, Consumer<Result> callback) {
         List<String> items = ItemCandidateSearch.search(prompt);
         List<String> fluids = ItemCandidateSearch.searchFluids(prompt, 20);
         var durabilityInfo = ItemCandidateSearch.durabilityInfo(items);
@@ -50,7 +68,7 @@ public final class LlmGenerateService {
         OpenAiCompatibleClient client = new OpenAiCompatibleClient();
         int maxRetries = PatternizerClientConfig.MAX_RETRIES.get();
 
-        attempt(client, messages, 0, maxRetries, itemSet, fluidSet, callback);
+        attempt(client, messages, 0, maxRetries, itemSet, fluidSet, progress, callback);
     }
 
     /** 硬校验：target 与所有物品/流体条目必须来自候选清单（双子物质案的防线）。 */
@@ -79,8 +97,13 @@ public final class LlmGenerateService {
 
     private static void attempt(OpenAiCompatibleClient client, List<Message> messages,
             int attempt, int maxRetries, java.util.Set<String> itemSet, java.util.Set<String> fluidSet,
-            Consumer<Result> callback) {
-        client.chatComplete(messages).whenComplete((content, error) -> {
+            ProgressListener progress, Consumer<Result> callback) {
+        progress.onAttemptStart(attempt);
+        boolean stream = PatternizerClientConfig.STREAM_OUTPUT.get();
+        var call = stream
+                ? client.chatCompleteStream(messages, progress::onDelta)
+                : client.chatComplete(messages);
+        call.whenComplete((content, error) -> {
             if (error != null) {
                 // 解包两种形态：LlmException 本体（超时/HTTP 错误）或 CompletionException 包装
                 String code;
@@ -131,7 +154,7 @@ public final class LlmGenerateService {
             // 自我修正：把错误回喂给模型
             messages.add(new Message("assistant", content));
             messages.add(new Message("user", PromptBuilder.correctionPrompt(errorLines)));
-            attempt(client, messages, attempt + 1, maxRetries, itemSet, fluidSet, callback);
+            attempt(client, messages, attempt + 1, maxRetries, itemSet, fluidSet, progress, callback);
         });
     }
 }

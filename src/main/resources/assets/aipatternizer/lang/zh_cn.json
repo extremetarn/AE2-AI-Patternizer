@@ -17,6 +17,10 @@
 
   "gui.aipatternizer.status.empty_prompt": "请先输入你的需求。",
   "gui.aipatternizer.status.calling": "正在调用模型，请稍候……",
+  "gui.aipatternizer.stage.generating": "▶ 正在调用模型生成（下方实时输出）……",
+  "gui.aipatternizer.stage.retrying": "▶ 校验未过，自我修正第 %s 轮……",
+  "gui.aipatternizer.stage.encoding": "▶ 服务端编码中……",
+  "gui.aipatternizer.stage.placing": "▶ 批量编码与落位中……",
   "gui.aipatternizer.status.failed": "失败：%s",
   "gui.aipatternizer.fail.no_key": "失败：未配置 API Key，点右上角齿轮进行设置。",
   "gui.aipatternizer.fail.io": "失败：网络错误或请求超时（%s）。请检查端点、网络或代理。",

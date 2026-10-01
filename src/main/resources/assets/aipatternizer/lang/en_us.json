@@ -17,6 +17,10 @@
 
   "gui.aipatternizer.status.empty_prompt": "Type what you need first.",
   "gui.aipatternizer.status.calling": "Calling the model, please wait...",
+  "gui.aipatternizer.stage.generating": "▶ Generating with LLM (streaming below)...",
+  "gui.aipatternizer.stage.retrying": "▶ Validation failed - self-correction round %s...",
+  "gui.aipatternizer.stage.encoding": "▶ Encoding on server...",
+  "gui.aipatternizer.stage.placing": "▶ Batch encoding and placing...",
   "gui.aipatternizer.status.failed": "Failed: %s",
   "gui.aipatternizer.fail.no_key": "Failed: API key not configured - click the gear (top right) to set it.",
   "gui.aipatternizer.fail.io": "Failed: network error / request timed out (%s). Check endpoint, network or proxy.",

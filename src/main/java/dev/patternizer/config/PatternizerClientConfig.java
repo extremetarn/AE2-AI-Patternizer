@@ -22,6 +22,7 @@ public final class PatternizerClientConfig {
     public static final ForgeConfigSpec.IntValue TIMEOUT_SECONDS;
     public static final ForgeConfigSpec.IntValue MAX_RETRIES;
     public static final ForgeConfigSpec.DoubleValue TEMPERATURE;
+    public static final ForgeConfigSpec.BooleanValue STREAM_OUTPUT;
     public static final ForgeConfigSpec.EnumValue<ProxyMode> PROXY_MODE;
     public static final ForgeConfigSpec.ConfigValue<String> PROXY_HOST;
     public static final ForgeConfigSpec.IntValue PROXY_PORT;
@@ -39,6 +40,8 @@ public final class PatternizerClientConfig {
                 .define("model", "gpt-4o-mini");
         TIMEOUT_SECONDS = b.comment("Request timeout in seconds")
                 .defineInRange("timeoutSeconds", 60, 5, 300);
+        STREAM_OUTPUT = b.comment("Stream LLM output (SSE) and show it live in the patternizer GUI")
+                .define("streamOutput", true);
         MAX_RETRIES = b.comment("Max self-correction retries when the model output fails validation")
                 .defineInRange("maxRetries", 3, 0, 8);
         TEMPERATURE = b.comment("Sampling temperature")

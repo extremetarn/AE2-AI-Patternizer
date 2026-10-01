@@ -65,6 +65,8 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
     /** 换行后的展示行与滚动偏移 */
     private final List<FormattedCharSequence> displayLines = new ArrayList<>();
     private int textScroll;
+    /** SSE 流式输出累计文本（CALLING 状态实时显示） */
+    private String streamText = "";
 
     private PatternSpec confirmedSpec;
 
@@ -147,6 +149,12 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         for (Component line : src) {
             this.displayLines.addAll(this.font.split(line, TEXT_WIDTH));
         }
+        // SSE 流式文本追加在状态行之后
+        if (this.streamText != null && !this.streamText.isEmpty()) {
+            for (String s : this.streamText.split("\n", -1)) {
+                this.displayLines.addAll(this.font.split(Component.literal(s), TEXT_WIDTH));
+            }
+        }
         this.textScroll = 0;
     }
 
@@ -158,7 +166,13 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         switch (this.state) {
         case INPUT -> startGenerate();
         case PREVIEW -> confirmEncode();
-        case LINE_PLAN -> PatternizerNetwork.CHANNEL.sendToServer(new LinePlanConfirmPacket());
+        case LINE_PLAN -> {
+            PatternizerNetwork.CHANNEL.sendToServer(new LinePlanConfirmPacket());
+            setState(State.LINE_WAIT);
+            this.statusLines.add(Component.translatable("gui.aipatternizer.stage.placing")
+                    .withStyle(net.minecraft.ChatFormatting.YELLOW));
+            rebuildDisplay();
+        }
         default -> {
         }
         }
@@ -181,14 +195,14 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
             return;
         }
         setState(State.LINE_WAIT);
-        this.statusLines.add(Component.translatable("gui.aipatternizer.status.analyzing"));
+        this.statusLines.add(Component.translatable("gui.aipatternizer.status.analyzing")
+                .withStyle(net.minecraft.ChatFormatting.YELLOW));
         rebuildDisplay();
         PatternizerNetwork.CHANNEL.sendToServer(new LinePlanRequestPacket(candidates.get(0), 1));
     }
 
     /** S2C 整线方案回执：展示缺口汇总，等玩家确认批量编码。 */
-    public void onLinePlanResult(dev.patternizer.net.LinePlanResultPacket packet) {
-        this.statusLines.clear();
+    public void onLinePlanResult(dev.patternizer.net.LinePlanResultPacket packet) {        this.statusLines.clear();
         if (packet.missingCount() == 0) {
             this.statusLines.add(Component.translatable("gui.aipatternizer.line.nothing_missing",
                     packet.totalNodes()));
@@ -235,9 +249,32 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
             return;
         }
         setState(State.CALLING);
-        this.statusLines.add(Component.translatable("gui.aipatternizer.status.calling"));
+        this.statusLines.add(Component.translatable("gui.aipatternizer.stage.generating")
+                .withStyle(net.minecraft.ChatFormatting.YELLOW));
         rebuildDisplay();
-        LlmGenerateService.generate(prompt, result -> Minecraft.getInstance().execute(() -> {
+        LlmGenerateService.generate(prompt, new LlmGenerateService.ProgressListener() {
+            @Override
+            public void onAttemptStart(int attempt) {
+                Minecraft.getInstance().execute(() -> {
+                    streamText = "";
+                    statusLines.clear();
+                    statusLines.add((attempt == 0
+                            ? Component.translatable("gui.aipatternizer.stage.generating")
+                            : Component.translatable("gui.aipatternizer.stage.retrying", attempt))
+                            .withStyle(net.minecraft.ChatFormatting.YELLOW));
+                    rebuildDisplay();
+                });
+            }
+
+            @Override
+            public void onDelta(String textSoFar) {
+                Minecraft.getInstance().execute(() -> {
+                    streamText = textSoFar;
+                    rebuildDisplay();
+                    textScroll = maxTextScroll(); // 流式期间钉住底部
+                });
+            }
+        }, result -> Minecraft.getInstance().execute(() -> {
             if (result instanceof LlmGenerateService.Result.Ok ok) {
                 // 预检：目标类样板（合成/切石/锻造）在客户端配方本里查无配方时，
                 // 直接给出改道建议，不让玩家走到编码失败那一步（2026-10-01 摩根案）
@@ -309,6 +346,17 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         PatternizerNetwork.CHANNEL.sendToServer(
                 new PatternSpecRequestPacket(PatternSpecJson.write(this.confirmedSpec)));
         setState(State.INPUT);
+        this.streamText = "";
+        this.statusLines.add(Component.translatable("gui.aipatternizer.stage.encoding")
+                .withStyle(net.minecraft.ChatFormatting.YELLOW));
+        rebuildDisplay();
+    }
+
+    /** 编码结果到达（成功/失败）后清掉阶段行。 */
+    public void clearStatus() {
+        this.statusLines.clear();
+        this.streamText = "";
+        rebuildDisplay();
     }
 
     /** 服务端回传多配方冲突：弹出选择界面（M3 / §10.5 不猜原则）。 */
