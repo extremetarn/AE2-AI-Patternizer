@@ -294,6 +294,24 @@ public class EncodeGameTest {
         helper.succeed();
     }
 
+    /** 设计原则 9 回归：AI 输出大写注册名时解析层归一小写，校验照常通过。 */
+    @GameTest(template = "empty")
+    public static void caseInsensitiveSpecParsing(GameTestHelper helper) {
+        try {
+            var spec = dev.patternizer.spec.PatternSpecJson.parse(
+                    "{\"type\":\"PROCESSING\",\"inputs\":[{\"item\":\"Minecraft:Iron_Ingot\",\"count\":1}],"
+                            + "\"outputs\":[{\"item\":\"Minecraft:Iron_Nugget\",\"count\":9}]}");
+            helper.assertTrue("minecraft:iron_ingot".equals(spec.inputs.get(0).item),
+                    "item should be normalized to lowercase but got " + spec.inputs.get(0).item);
+            helper.assertTrue(PatternSpecValidator.validate(spec).isEmpty(),
+                    "normalized spec should validate");
+        } catch (Exception e) {
+            helper.fail("parse threw: " + e);
+            return;
+        }
+        helper.succeed();
+    }
+
     /** M3.5：不可收回黑名单——命中即强制预置式，布局中不再出现该物品。 */
     @GameTest(template = "empty")
     public static void catalystPolicyBlacklist(GameTestHelper helper) {        PatternSpec spec = new PatternSpec();

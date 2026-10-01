@@ -71,7 +71,12 @@ public final class PatternizerClientConfig {
     }
 
     public static java.util.Set<String> unreturnableSet() {
-        return new java.util.HashSet<>(UNRETURNABLE_CATALYSTS.get());
+        // 设计原则 9：大小写不敏感——配置里写大写也归一到小写
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (String s : UNRETURNABLE_CATALYSTS.get()) {
+            out.add(s.trim().toLowerCase(java.util.Locale.ROOT));
+        }
+        return out;
     }
 
     public static void save() {

@@ -21,10 +21,10 @@ public final class ItemCandidateSearch {
 
     private static final int DEFAULT_LIMIT = 80;
     private static final Pattern CJK_RUN = Pattern.compile("[\\u4e00-\\u9fff]{2,}");
-    // 修正（2026-10-01）：后续字符类必须包含大写——原写法 [a-z0-9_] 使
-    // "ATM" 这类全大写缩写永远无法被提取（ATM 案根因）
     private static final Pattern LATIN_WORD = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]{2,}");
-    private static final Pattern REGISTRY_REF = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_/.-]+");
+    // CASE_INSENSITIVE：MC 里永远不要大小写敏感（设计原则 9）
+    private static final Pattern REGISTRY_REF = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_/.-]+",
+            Pattern.CASE_INSENSITIVE);
 
     private ItemCandidateSearch() {
     }

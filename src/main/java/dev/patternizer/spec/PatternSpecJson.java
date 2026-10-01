@@ -42,8 +42,9 @@ public final class PatternSpecJson {
 
         PatternSpec spec = new PatternSpec();
         spec.type = parseType(optString(root, "type", "processing"));
-        spec.target = optString(root, "target", null);
-        spec.recipeId = optString(root, "recipe_id", null);
+        // 设计原则 9：id 全部归一小写，AI 输出大写注册名也能匹配
+        spec.target = lowerOrNull(optString(root, "target", null));
+        spec.recipeId = lowerOrNull(optString(root, "recipe_id", null));
 
         if (root.has("inputs") && root.get("inputs").isJsonArray()) {
             for (JsonElement e : root.getAsJsonArray("inputs")) {
@@ -64,7 +65,7 @@ public final class PatternSpecJson {
         if (root.has("durability_batch") && root.get("durability_batch").isJsonObject()) {
             JsonObject db = root.getAsJsonObject("durability_batch");
             PatternSpec.DurabilityBatch batch = new PatternSpec.DurabilityBatch();
-            batch.tool = optString(db, "tool", null);
+            batch.tool = lowerOrNull(optString(db, "tool", null));
             batch.usesPerTool = optInt(db, "uses_per_tool", 1);
             spec.durabilityBatch = batch;
         }
@@ -160,8 +161,8 @@ public final class PatternSpecJson {
 
     private static PatternSpec.Entry parseEntry(JsonObject o) throws SpecParseException {
         PatternSpec.Entry e = new PatternSpec.Entry();
-        e.item = optString(o, "item", null);
-        e.fluid = optString(o, "fluid", null);
+        e.item = lowerOrNull(optString(o, "item", null));
+        e.fluid = lowerOrNull(optString(o, "fluid", null));
         e.count = optInt(o, "count", 1);
         e.amount = optInt(o, "amount", 0);
         e.role = parseEnum(PatternSpec.Role.class, optString(o, "role", "consumed"), PatternSpec.Role.CONSUMED);
@@ -210,6 +211,10 @@ public final class PatternSpecJson {
     private static String optString(JsonObject o, String key, String fallback) {
         JsonElement el = o.get(key);
         return el != null && el.isJsonPrimitive() ? el.getAsString() : fallback;
+    }
+
+    private static String lowerOrNull(String s) {
+        return s == null ? null : s.trim().toLowerCase(Locale.ROOT);
     }
 
     private static int optInt(JsonObject o, String key, int fallback) {
