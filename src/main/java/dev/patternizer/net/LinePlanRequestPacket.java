@@ -11,6 +11,7 @@ import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import appeng.api.networking.IGrid;
 import dev.patternizer.menu.AiPatternizerMenu;
 import dev.patternizer.planner.GapAnalyzer;
 import dev.patternizer.planner.GapAnalyzer.PlanResult;
@@ -21,6 +22,8 @@ import dev.patternizer.planner.NetworkSurvey;
  * 服务端：网络现状调查 → 缺口分析 → 缓存方案 → 回执 LinePlanResult。
  */
 public class LinePlanRequestPacket {
+
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
 
     private final String target;
     private final long count;
@@ -51,17 +54,25 @@ public class LinePlanRequestPacket {
                         new LinePlanResultPacket(0, 0, 0, 0, List.of(), List.of(), List.of()));
                 return;
             }
-            var grid = menu.getBlockEntity().getGrid();
+            IGrid grid = menu.getBlockEntity().getGrid();
             NetworkSurvey survey = grid != null ? NetworkSurvey.of(grid) : NetworkSurvey.empty();
 
             var item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(msg.target));
             PlanResult result;
             if (item == null) {
+                LOGGER.warn("[aipatternizer] line plan: unknown target item '{}'", msg.target);
                 result = new PlanResult(List.of(), List.of(), List.of(), 0);
             } else {
                 result = GapAnalyzer.analyze(player.server.getRecipeManager(), player.level(), survey,
                         item, Math.max(1, msg.count));
             }
+            LOGGER.info("[aipatternizer] line plan target={} | survey craftable={} patterns={} stock={} | "
+                    + "canCraft(target)={} stockOf(target)={} | nodes={} missing={} cycles={} manual={}",
+                    msg.target,
+                    survey.craftableItems().size(), survey.patternOutputs().size(), survey.stock().size(),
+                    item != null && survey.canCraft(item), item != null ? survey.stockOf(item) : -1,
+                    result.totalNodes(), result.missing().size(), result.cycleItems().size(),
+                    result.manualItems().size());
             LinePlanStateCache.put(player.getUUID(), result);
 
             List<String> missingTop = new ArrayList<>();

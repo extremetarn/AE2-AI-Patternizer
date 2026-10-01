@@ -231,13 +231,19 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
     }
 
     /** S2C 整线方案回执：展示缺口汇总，等玩家确认批量编码。 */
-    public void onLinePlanResult(dev.patternizer.net.LinePlanResultPacket packet) {        this.statusLines.clear();
+    public void onLinePlanResult(dev.patternizer.net.LinePlanResultPacket packet) {
+        this.statusLines.clear();
         if (packet.missingCount() == 0) {
-            this.statusLines.add(Component.translatable("gui.aipatternizer.line.nothing_missing",
-                    packet.totalNodes()));
-            for (String manual : packet.manualTop()) {
-                this.statusLines.add(Component.translatable("gui.aipatternizer.line.manual_item",
-                        displayNameOf(manual)));
+            if (packet.totalNodes() == 0 && packet.manualCount() == 0) {
+                // 目标根本没展开：无法识别目标物品或编写台未就绪
+                this.statusLines.add(Component.translatable("gui.aipatternizer.status.no_target"));
+            } else {
+                this.statusLines.add(Component.translatable("gui.aipatternizer.line.nothing_missing",
+                        packet.totalNodes()));
+                for (String manual : packet.manualTop()) {
+                    this.statusLines.add(Component.translatable("gui.aipatternizer.line.manual_item",
+                            displayNameOf(manual)));
+                }
             }
             setState(State.LINE_DONE);
             return;

@@ -56,7 +56,10 @@ public final class GapAnalyzer {
         Map<Item, Long> demand = new HashMap<>();
         int[] nodes = { 0 };
 
-        expand(index, level, survey, target, count, missing, cycles, manual, expanded, visiting, demand, nodes);
+        // 根节点无条件展开：玩家点「整线补齐」是要让网络能造这个物品，
+        // 库存里有没有/网络会不会做都不能短路（2026-10-01「共0节点」假阳性案）
+        expand(index, level, survey, target, count, missing, cycles, manual, expanded, visiting, demand,
+                nodes, true);
 
         // 需求量以最终累加值修正到节点上
         List<PlanNode> finalMissing = new ArrayList<>();
@@ -70,12 +73,17 @@ public final class GapAnalyzer {
     private static void expand(Map<Item, List<Recipe<?>>> index, Level level, NetworkSurvey survey,
             Item item, long amount,
             List<PlanNode> missing, List<Item> cycles, List<Item> manual,
-            Set<Item> expanded, Set<Item> visiting, Map<Item, Long> demand, int[] nodes) {
+            Set<Item> expanded, Set<Item> visiting, Map<Item, Long> demand, int[] nodes, boolean isRoot) {
         if (nodes[0] >= MAX_NODES) {
             return;
         }
-        // 网络已会合成 or 存量充足 → 无需新建样板
-        if (survey.canCraft(item) || survey.stockOf(item) >= amount) {
+        // 满足判定：根节点只在「网络已会合成」时才算覆盖——「库存里有」不算
+        // （整线补齐的语义是让网络能造，不是看仓库里现在有没有）；
+        // 非根节点沿用「会做 or 存量够」双重短路
+        boolean satisfied = isRoot
+                ? survey.canCraft(item)
+                : (survey.canCraft(item) || survey.stockOf(item) >= amount);
+        if (satisfied) {
             return;
         }
         // 环检测：展开路径上再次遇到自己
@@ -118,7 +126,7 @@ public final class GapAnalyzer {
         long runs = ceilDiv(amount, outCount);
         for (Map.Entry<Item, Integer> input : mergedInputs(chosen).entrySet()) {
             expand(index, level, survey, input.getKey(), runs * input.getValue(),
-                    missing, cycles, manual, expanded, visiting, demand, nodes);
+                    missing, cycles, manual, expanded, visiting, demand, nodes, false);
         }
         visiting.remove(item);
     }
