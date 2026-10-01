@@ -58,13 +58,24 @@ public final class LlmGenerateService {
         List<String> items = ItemCandidateSearch.search(prompt);
         List<String> fluids = ItemCandidateSearch.searchFluids(prompt, 20);
         var durabilityInfo = ItemCandidateSearch.durabilityInfo(items);
+        // JEI/EMI 桥：Top5 候选的作者信息页文本（§5.6 信息页 AI 消化）
+        java.util.Map<String, List<String>> infoTexts = new java.util.LinkedHashMap<>();
+        if (dev.patternizer.client.recipeview.RecipeView.active()) {
+            var bridge = dev.patternizer.client.recipeview.RecipeView.source();
+            for (String id : items.subList(0, Math.min(5, items.size()))) {
+                List<String> texts = bridge.infoTexts(id);
+                if (!texts.isEmpty()) {
+                    infoTexts.put(id, texts);
+                }
+            }
+        }
         java.util.Set<String> itemSet = new java.util.HashSet<>(items);
         java.util.Set<String> fluidSet = new java.util.HashSet<>(fluids);
-        LOGGER.info("[aipatternizer] generate for prompt='{}' | item candidates={} fluids={} top10={}",
+        LOGGER.info("[aipatternizer] generate for prompt='{}' | item candidates={} fluids={} top10={} infoTexts={}",
                 prompt, items.size(), fluids.size(),
-                items.subList(0, Math.min(10, items.size())));
+                items.subList(0, Math.min(10, items.size())), infoTexts.keySet());
 
-        List<Message> messages = PromptBuilder.initialMessages(prompt, items, fluids, durabilityInfo);
+        List<Message> messages = PromptBuilder.initialMessages(prompt, items, fluids, durabilityInfo, infoTexts);
         OpenAiCompatibleClient client = new OpenAiCompatibleClient();
         int maxRetries = PatternizerClientConfig.MAX_RETRIES.get();
 

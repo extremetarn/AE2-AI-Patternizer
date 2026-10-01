@@ -344,7 +344,7 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         }));
     }
 
-    /** 客户端配方本预检：目标类样板是否存在任何可编码路线（v0.11 全量枚举版）。 */
+    /** 客户端配方本预检：目标类样板是否存在任何可编码路线（枚举为空时问 JEI 桥兜底）。 */
     private static boolean hasRecipeForTarget(PatternSpec spec) {
         if (spec.type == PatternSpec.Type.PROCESSING || spec.target == null) {
             return true;
@@ -353,9 +353,15 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         if (mc.level == null) {
             return true;
         }
-        return !dev.patternizer.net.RecipeResolver
+        if (!dev.patternizer.net.RecipeResolver
                 .enumerate(mc.level.getRecipeManager(), mc.level, spec.target)
-                .isEmpty();
+                .isEmpty()) {
+            return true;
+        }
+        // JEI 桥兜底：RecipeManager 枚举不到（配料藏自定义字段被过滤）时，JEI 可能能读出全内容
+        return dev.patternizer.client.recipeview.RecipeView.active()
+                && !dev.patternizer.client.recipeview.RecipeView.source().recipesProducing(spec.target)
+                        .isEmpty();
     }
 
     /** 把内部错误码翻译成玩家能懂的提示（§失败要可解释）。 */
@@ -402,6 +408,53 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         this.statusLines.clear();
         this.streamText = "";
         rebuildDisplay();
+    }
+
+    /**
+     * JEI 兜底（Star Forge 案）：服务端枚举不到配方时，用 JEI 的全内容
+     * （含流体）构造处理样板规格进预览，玩家确认后按处理样板编码。
+     * @return true 表示已接管（进入预览），不再显示"找不到配方"报错
+     */
+    public boolean tryJeiFallback(String targetId) {
+        if (!dev.patternizer.client.recipeview.RecipeView.active()) {
+            return false;
+        }
+        var recipes = dev.patternizer.client.recipeview.RecipeView.source().recipesProducing(targetId);
+        if (recipes.isEmpty()) {
+            return false;
+        }
+        var first = recipes.get(0);
+        PatternSpec spec = new PatternSpec();
+        spec.type = PatternSpec.Type.PROCESSING;
+        for (var in : first.inputs()) {
+            PatternSpec.Entry e = new PatternSpec.Entry();
+            if (in.fluid()) {
+                e.fluid = in.id();
+                e.amount = (int) in.amount();
+            } else {
+                e.item = in.id();
+                e.count = (int) in.amount();
+            }
+            spec.inputs.add(e);
+        }
+        for (var out : first.outputs()) {
+            PatternSpec.Entry e = new PatternSpec.Entry();
+            if (out.fluid()) {
+                e.fluid = out.id();
+                e.amount = (int) out.amount();
+            } else {
+                e.item = out.id();
+                e.count = (int) out.amount();
+            }
+            spec.outputs.add(e);
+        }
+        spec.note = "来自 JEI 的机器配方：" + first.recipeTypeId();
+        this.confirmedSpec = spec;
+        buildPreview(spec);
+        this.statusLines.clear();
+        this.statusLines.add(Component.translatable("gui.aipatternizer.jei_fallback"));
+        setState(State.PREVIEW);
+        return true;
     }
 
     /** 服务端回传多配方冲突：弹出选择界面（M3 / §10.5 不猜原则）。 */

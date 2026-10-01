@@ -125,6 +125,8 @@ repositories {
     flatDir {
         dirs 'libs'
     }
+    // JEI 官方 maven
+    maven { url = "https://maven.blamejared.com/" }
 }
 
 dependencies {
@@ -142,6 +144,11 @@ dependencies {
     compileOnly fg.deobf("blank:appliedenergistics2-forge:15.4.11")
     runtimeOnly fg.deobf("blank:appliedenergistics2-forge:15.4.11")
     runtimeOnly fg.deobf("blank:guideme:20.1.15")
+
+    // JEI（M3.7 兼容桥，软依赖）：API 编译期 + 完整 jar dev 运行时
+    compileOnly fg.deobf("mezz.jei:jei-1.20.1-common-api:15.62.0.217")
+    compileOnly fg.deobf("mezz.jei:jei-1.20.1-forge-api:15.62.0.217")
+    runtimeOnly fg.deobf("mezz.jei:jei-1.20.1-forge:15.62.0.217")
 
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime

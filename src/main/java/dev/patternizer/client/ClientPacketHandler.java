@@ -26,6 +26,12 @@ public final class ClientPacketHandler {
             aps.openRecipeChoice(List.of(detail.split("\n")));
             return;
         }
+        // JEI 兜底：找不到配方时先让桥接管（Star Forge 案），接管成功则不报错
+        if ("recipe_not_found".equals(result) && detail != null
+                && mc.screen instanceof dev.patternizer.client.screen.AiPatternizerScreen aps
+                && aps.tryJeiFallback(detail)) {
+            return;
+        }
         // 非成功结果：清掉编写台界面上的阶段指示行
         if (!"ok".equals(result) && !"choose_recipe".equals(result)
                 && mc.screen instanceof dev.patternizer.client.screen.AiPatternizerScreen aps) {

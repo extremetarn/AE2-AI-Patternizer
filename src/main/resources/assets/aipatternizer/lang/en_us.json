@@ -34,6 +34,7 @@
   "gui.aipatternizer.preview.outputs": "Outputs:",
   "gui.aipatternizer.preview.note": "Note: %s",
   "gui.aipatternizer.more_lines": "... +%s more",
+  "gui.aipatternizer.jei_fallback": "RecipeManager 未收录此配方，已从 JEI 读取完整内容转为处理样板：",
   "gui.aipatternizer.setup.title": "Setup checklist:",
   "gui.aipatternizer.setup.returned": "- %s: must be pulled back into the network; blocking mode / lock crafting recommended",
   "gui.aipatternizer.setup.preplaced": "- %s: pre-place it in the machine; make sure it cannot be extracted",

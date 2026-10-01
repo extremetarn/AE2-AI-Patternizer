@@ -34,6 +34,7 @@
   "gui.aipatternizer.preview.outputs": "输出：",
   "gui.aipatternizer.preview.note": "说明：%s",
   "gui.aipatternizer.more_lines": "……还有 %s 行",
+  "gui.aipatternizer.jei_fallback": "配方系统未收录此配方，已从 JEI 读取完整内容转为处理样板：",
   "gui.aipatternizer.setup.title": "配套搭建清单：",
   "gui.aipatternizer.setup.returned": "- %s：需从机器抽回网络；供应器建议开阻挡模式/锁定合成",
   "gui.aipatternizer.setup.preplaced": "- %s：请预置于机器内，并确保不会被抽走",
