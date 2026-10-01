@@ -149,14 +149,20 @@ public final class RecipeResolver {
         if (serializerId != null && serializerId.getPath().startsWith("crafting_special")) {
             return false;
         }
-        boolean anyInput = false;
-        for (Ingredient ingredient : recipe.getIngredients()) {
-            if (ingredient != null && !ingredient.isEmpty()) {
-                anyInput = true;
-                break;
+        // 锻造配方豁免：SmithingRecipe 的配料在谓词字段里，getIngredients() 恒空
+        if (!(recipe instanceof SmithingRecipe)) {
+            boolean anyInput = false;
+            for (Ingredient ingredient : recipe.getIngredients()) {
+                if (ingredient != null && !ingredient.isEmpty()) {
+                    anyInput = true;
+                    break;
+                }
+            }
+            if (!anyInput) {
+                return false;
             }
         }
-        return anyInput;
+        return true;
     }
 
     private static Kind classify(RecipeType<?> type) {
