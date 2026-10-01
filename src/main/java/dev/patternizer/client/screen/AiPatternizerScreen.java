@@ -251,9 +251,16 @@ public class AiPatternizerScreen extends AbstractContainerScreen<AiPatternizerMe
         this.statusLines.add(Component.translatable("gui.aipatternizer.line.summary",
                 packet.totalNodes(), packet.missingCount(), packet.cycleCount(), packet.manualCount()));
         for (String entry : packet.missingTop()) {
-            String id = entry.substring(0, entry.lastIndexOf(' '));
-            String count = entry.substring(entry.lastIndexOf(' ') + 1);
-            this.statusLines.add(Component.literal("  " + displayNameOf(id) + " " + count));
+            // 格式：物品id x数量 @配方类型 配方id 备选K
+            int at = entry.indexOf(" @");
+            String left = at > 0 ? entry.substring(0, at) : entry;
+            String right = at > 0 ? entry.substring(at + 2) : "";
+            int sp = left.indexOf(" x");
+            String id = sp > 0 ? left.substring(0, sp) : left;
+            String count = sp > 0 ? left.substring(sp) : "";
+            String typeId = right.isEmpty() ? "" : right.split(" ")[0];
+            String alt = right.contains("备选") ? "（" + right.substring(right.indexOf("备选")) + "）" : "";
+            this.statusLines.add(Component.literal("  " + displayNameOf(id) + count + " ← " + typeId + alt));
         }
         if (!packet.cycleIds().isEmpty()) {
             this.statusLines.add(Component.translatable("gui.aipatternizer.line.cycles"));

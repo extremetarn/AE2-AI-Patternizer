@@ -26,8 +26,12 @@ import dev.patternizer.net.RecipeResolver;
  */
 public final class GapAnalyzer {
 
-    /** 缺口样板节点：缺什么、缺多少、用哪条配方造。 */
-    public record PlanNode(Item item, long amount, Recipe<?> recipe) {
+    /** 缺口样板节点：缺什么、缺多少、用哪条配方造、还剩几条备选路线。 */
+    public record PlanNode(Item item, long amount, Recipe<?> recipe, int alternatives) {
+
+        public String recipeId() {
+            return recipe.getId().toString();
+        }
 
         public String recipeTypeId() {
             var key = ForgeRegistries.RECIPE_TYPES.getKey(recipe.getType());
@@ -65,7 +69,7 @@ public final class GapAnalyzer {
         List<PlanNode> finalMissing = new ArrayList<>();
         for (PlanNode node : missing) {
             finalMissing.add(new PlanNode(node.item(), demand.getOrDefault(node.item(), node.amount()),
-                    node.recipe()));
+                    node.recipe(), node.alternatives()));
         }
         return new PlanResult(finalMissing, cycles, manual, nodes[0]);
     }
@@ -108,7 +112,7 @@ public final class GapAnalyzer {
             return;
         }
 
-        Recipe<?> chosen = chooseBest(level, survey, recipes);
+        Recipe<?> chosen = chooseBest(level, survey, recipes, visiting);
         if (chosen == null) {
             if (!manual.contains(item)) {
                 manual.add(item);
@@ -120,7 +124,7 @@ public final class GapAnalyzer {
         expanded.add(item);
         demand.merge(item, amount, Long::sum);
         nodes[0]++;
-        missing.add(new PlanNode(item, amount, chosen));
+        missing.add(new PlanNode(item, amount, chosen, recipes.size() - 1));
 
         long outCount = Math.max(1, chosen.getResultItem(level.registryAccess()).getCount());
         long runs = ceilDiv(amount, outCount);
@@ -133,20 +137,27 @@ public final class GapAnalyzer {
 
     /**
      * 轻量选路（§10.5 第一层）：统计每条配方「网络不会做且存量不足」的输入数，
-     * 最少者胜。网络能自给自足的路线自然胜，荒诞路线（拆工具得粒）自然输。
+     * 最少者胜；会制造循环的路线（输入里有展开路径上的物品，如 星→块→星）重罚。
+     * 网络能自给自足的路线自然胜，荒诞路线（拆工具得粒）自然输。
      */
-    private static Recipe<?> chooseBest(Level level, NetworkSurvey survey, List<Recipe<?>> recipes) {
+    private static Recipe<?> chooseBest(Level level, NetworkSurvey survey, List<Recipe<?>> recipes,
+            Set<Item> visiting) {
         Recipe<?> best = null;
-        long bestUnknown = Long.MAX_VALUE;
+        long bestScore = Long.MAX_VALUE;
         for (Recipe<?> recipe : recipes) {
             long unknown = 0;
+            boolean cycleForming = false;
             for (Map.Entry<Item, Integer> input : mergedInputs(recipe).entrySet()) {
+                if (visiting.contains(input.getKey())) {
+                    cycleForming = true;
+                }
                 if (!survey.canCraft(input.getKey()) && survey.stockOf(input.getKey()) < input.getValue()) {
                     unknown++;
                 }
             }
-            if (unknown < bestUnknown) {
-                bestUnknown = unknown;
+            long score = unknown + (cycleForming ? 1000 : 0);
+            if (score < bestScore) {
+                bestScore = score;
                 best = recipe;
             }
         }

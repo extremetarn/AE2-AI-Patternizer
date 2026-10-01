@@ -61,10 +61,15 @@ public class LinePlanRequestPacket {
             PlanResult result;
             if (item == null) {
                 LOGGER.warn("[aipatternizer] line plan: unknown target item '{}'", msg.target);
-                result = new PlanResult(List.of(), List.of(), List.of(), 0);
+                result = new PlanResult(List.of(), List.of(), List.of(), -1); // -1 = 无法识别目标
             } else {
                 result = GapAnalyzer.analyze(player.server.getRecipeManager(), player.level(), survey,
                         item, Math.max(1, msg.count));
+                // 全零且根节点可合成 = 网络已覆盖（与"无法识别"区分开，2026-10-01）
+                if (result.totalNodes() == 0 && result.missing().isEmpty()
+                        && result.manualItems().isEmpty() && survey.canCraft(item)) {
+                    result = new PlanResult(List.of(), List.of(), List.of(), -2); // -2 = 已可合成
+                }
             }
             LOGGER.info("[aipatternizer] line plan target={} | survey craftable={} patterns={} stock={} | "
                     + "canCraft(target)={} stockOf(target)={} | nodes={} missing={} cycles={} manual={}",
@@ -77,7 +82,10 @@ public class LinePlanRequestPacket {
 
             List<String> missingTop = new ArrayList<>();
             for (var node : result.missing()) {
-                missingTop.add(ForgeRegistries.ITEMS.getKey(node.item()) + " x" + node.amount());
+                // 格式：物品id x数量 @配方类型 配方id 备选K —— 选路与备选对玩家可见
+                missingTop.add(ForgeRegistries.ITEMS.getKey(node.item()) + " x" + node.amount()
+                        + " @" + node.recipeTypeId() + " " + node.recipeId()
+                        + (node.alternatives() > 0 ? " 备选" + node.alternatives() : ""));
                 if (missingTop.size() >= 16) {
                     break;
                 }
