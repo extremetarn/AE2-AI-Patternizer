@@ -26,6 +26,8 @@ import dev.patternizer.net.RecipeResolver;
  */
 public final class GapAnalyzer {
 
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+
     /** 缺口样板节点：缺什么、缺多少、用哪条配方造、还剩几条备选路线。 */
     public record PlanNode(Item item, long amount, Recipe<?> recipe, int alternatives) {
 
@@ -125,6 +127,8 @@ public final class GapAnalyzer {
         demand.merge(item, amount, Long::sum);
         nodes[0]++;
         missing.add(new PlanNode(item, amount, chosen, recipes.size() - 1));
+        LOGGER.info("[aipatternizer] gap node: {} x{} <- {} (alternatives={})",
+                ForgeRegistries.ITEMS.getKey(item), amount, chosen.getId(), recipes.size() - 1);
 
         long outCount = Math.max(1, chosen.getResultItem(level.registryAccess()).getCount());
         long runs = ceilDiv(amount, outCount);

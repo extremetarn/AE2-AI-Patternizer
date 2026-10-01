@@ -131,7 +131,11 @@ public final class RecipeResolver {
      * 有效性过滤（v0.11「无效配方」剔除）：
      * - 结果为空或与目标不符（动态配方常见）；
      * - SmithingTrimRecipe 纹饰（同物品改性，不产出新物，玩家眼中的「附魔配方」）；
-     * - crafting_special_* 动态配方（烟花/染色/地图复制等，无法编码为静态样板）。
+     * - crafting_special_* 动态配方（烟花/染色/地图复制等，无法编码为静态样板）；
+     * - 零有效配料的配方：原版没有合法的零输入物品配方，有就是坏的
+     *   （KubeJS 引用失效）或配料藏在自定义字段里（Create 机械动力合成器的
+     *   getIngredients() 默认返回空——2026-10-01 ATM之星案根因），
+     *   会让"零输入"在选路中作弊获胜、把树断掉。
      */
     public static boolean isValidRoute(Recipe<?> recipe, Level level, Item target) {
         ItemStack result = recipe.getResultItem(level.registryAccess());
@@ -145,7 +149,14 @@ public final class RecipeResolver {
         if (serializerId != null && serializerId.getPath().startsWith("crafting_special")) {
             return false;
         }
-        return true;
+        boolean anyInput = false;
+        for (Ingredient ingredient : recipe.getIngredients()) {
+            if (ingredient != null && !ingredient.isEmpty()) {
+                anyInput = true;
+                break;
+            }
+        }
+        return anyInput;
     }
 
     private static Kind classify(RecipeType<?> type) {
