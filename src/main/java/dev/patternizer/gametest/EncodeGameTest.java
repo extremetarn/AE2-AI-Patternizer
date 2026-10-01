@@ -349,7 +349,8 @@ public class EncodeGameTest {
     @GameTest(template = "empty")
     public static void gapAnalyzerWithSurvey(GameTestHelper helper) {
         var survey = new dev.patternizer.planner.NetworkSurvey(
-                java.util.Set.of(Items.IRON_INGOT, Items.STICK), java.util.Set.of(), java.util.Map.of());
+                java.util.Set.of(Items.IRON_INGOT, Items.STICK), java.util.Set.of(), java.util.Map.of(),
+                java.util.Map.of());
         var result = dev.patternizer.planner.GapAnalyzer.analyze(
                 helper.getLevel().getServer().getRecipeManager(), helper.getLevel(),
                 survey, Items.IRON_PICKAXE, 1);

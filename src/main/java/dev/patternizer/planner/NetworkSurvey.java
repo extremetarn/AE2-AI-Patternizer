@@ -1,7 +1,9 @@
 package dev.patternizer.planner;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -18,12 +20,14 @@ import appeng.helpers.patternprovider.PatternProviderLogicHost;
  * ME 网络现状调查（§7.3a）：
  * - 可下单物品（合成服务枚举，即网络已有样板能合成什么）；
  * - 供应器里现有样板的产物集（v0.7 调研：getLogic().getPatternInv() + decodePattern）；
- * - 网络存量统计。
+ * - 网络存量统计；
+ * - 样板产物 → 供应器坐标（覆盖判定的证据，2026-10-01：玩家说"没有"时给得出位置）。
  */
-public record NetworkSurvey(Set<Item> craftableItems, Set<Item> patternOutputs, Map<Item, Long> stock) {
+public record NetworkSurvey(Set<Item> craftableItems, Set<Item> patternOutputs, Map<Item, Long> stock,
+        Map<Item, List<net.minecraft.core.BlockPos>> patternLocations) {
 
     public static NetworkSurvey empty() {
-        return new NetworkSurvey(Set.of(), Set.of(), Map.of());
+        return new NetworkSurvey(Set.of(), Set.of(), Map.of(), Map.of());
     }
 
     public static NetworkSurvey of(IGrid grid) {
@@ -37,6 +41,7 @@ public record NetworkSurvey(Set<Item> craftableItems, Set<Item> patternOutputs, 
 
         // ② 供应器现有样板产物（与①互为佐证，样板可能在未上线的供应器里）
         Set<Item> patternOutputs = new HashSet<>();
+        Map<Item, List<net.minecraft.core.BlockPos>> locations = new HashMap<>();
         for (Class<?> machineClass : grid.getMachineClasses()) {
             if (!PatternProviderLogicHost.class.isAssignableFrom(machineClass)) {
                 continue;
@@ -57,6 +62,8 @@ public record NetworkSurvey(Set<Item> craftableItems, Set<Item> patternOutputs, 
                         for (var out : details.getOutputs()) {
                             if (out.what() instanceof AEItemKey itemKey) {
                                 patternOutputs.add(itemKey.getItem());
+                                locations.computeIfAbsent(itemKey.getItem(), k -> new ArrayList<>())
+                                        .add(host.getBlockEntity().getBlockPos());
                             }
                         }
                     }
@@ -71,7 +78,7 @@ public record NetworkSurvey(Set<Item> craftableItems, Set<Item> patternOutputs, 
                 stock.put(itemKey.getItem(), entry.getLongValue());
             }
         }
-        return new NetworkSurvey(craftable, patternOutputs, stock);
+        return new NetworkSurvey(craftable, patternOutputs, stock, locations);
     }
 
     /** 该物品网络已可自动合成（已有样板）。 */

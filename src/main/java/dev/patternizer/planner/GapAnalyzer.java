@@ -114,7 +114,7 @@ public final class GapAnalyzer {
             return;
         }
 
-        Recipe<?> chosen = chooseBest(level, survey, recipes, visiting);
+        Recipe<?> chosen = chooseBest(level, survey, recipes, visiting, index, item);
         if (chosen == null) {
             if (!manual.contains(item)) {
                 manual.add(item);
@@ -141,16 +141,19 @@ public final class GapAnalyzer {
 
     /**
      * 轻量选路（§10.5 第一层）：统计每条配方「网络不会做且存量不足」的输入数，
-     * 最少者胜；会制造循环的路线（输入里有展开路径上的物品，如 星→块→星）重罚。
+     * 最少者胜；会制造循环的路线（输入里有展开路径上的物品，如 星→块→星）罚 1000 分；
+     * 压缩↔分解对（输入物由本节点产物合成，如 块由 9 星合成而星由块分解）罚 500 分——
+     * 没有块的库存时，"块分解出星"不是路线是死循环（2026-10-01 实测）。
      * 网络能自给自足的路线自然胜，荒诞路线（拆工具得粒）自然输。
      */
     private static Recipe<?> chooseBest(Level level, NetworkSurvey survey, List<Recipe<?>> recipes,
-            Set<Item> visiting) {
+            Set<Item> visiting, Map<Item, List<Recipe<?>>> index, Item item) {
         Recipe<?> best = null;
         long bestScore = Long.MAX_VALUE;
         for (Recipe<?> recipe : recipes) {
             long unknown = 0;
             boolean cycleForming = false;
+            boolean decompPair = false;
             for (Map.Entry<Item, Integer> input : mergedInputs(recipe).entrySet()) {
                 if (visiting.contains(input.getKey())) {
                     cycleForming = true;
@@ -158,8 +161,15 @@ public final class GapAnalyzer {
                 if (!survey.canCraft(input.getKey()) && survey.stockOf(input.getKey()) < input.getValue()) {
                     unknown++;
                 }
+                // 分解对检测：输入物（如星块）的配方以本节点产物（星）为原料
+                for (Recipe<?> inputRecipe : index.getOrDefault(input.getKey(), List.of())) {
+                    if (mergedInputs(inputRecipe).containsKey(item)) {
+                        decompPair = true;
+                        break;
+                    }
+                }
             }
-            long score = unknown + (cycleForming ? 1000 : 0);
+            long score = unknown + (cycleForming ? 1000 : 0) + (decompPair ? 500 : 0);
             if (score < bestScore) {
                 bestScore = score;
                 best = recipe;

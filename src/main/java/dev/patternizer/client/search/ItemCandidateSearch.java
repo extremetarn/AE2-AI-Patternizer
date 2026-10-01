@@ -138,6 +138,10 @@ public final class ItemCandidateSearch {
             if (longestCjk != null && displayLower.equals(longestCjk)) {
                 score += 20;
             }
+            // 全查询精确相等（ATM之星案：star 与 star_block 同分时，全名相等者断层领先）
+            if (displayLower.equals(prompt.trim().toLowerCase(Locale.ROOT))) {
+                score += 1000;
+            }
 
             // 模组名与缩写匹配（"ATM" ↔ AllTheModium 缩写场景）
             if (!latinTokens.isEmpty()) {

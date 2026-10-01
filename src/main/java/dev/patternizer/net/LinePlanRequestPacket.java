@@ -78,6 +78,11 @@ public class LinePlanRequestPacket {
                     item != null && survey.canCraft(item), item != null ? survey.stockOf(item) : -1,
                     result.totalNodes(), result.missing().size(), result.cycleItems().size(),
                     result.manualItems().size());
+            // 覆盖判定的证据：哪台供应器里有产出该物品的样板（2026-10-01 争议定案用）
+            if (item != null && survey.canCraft(item)) {
+                LOGGER.info("[aipatternizer] {} is covered; patterns producing it are in providers at: {}",
+                        msg.target, survey.patternLocations().get(item));
+            }
             LinePlanStateCache.put(player.getUUID(), result);
 
             List<String> missingTop = new ArrayList<>();
